@@ -1,0 +1,126 @@
+<Window x:Class="FeenicsCsvImport.Gui.PreviewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Import Preview" Height="600" Width="1200"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Import Preview" FontSize="18" FontWeight="Bold"/>
+            <TextBlock x:Name="txtSummary" Foreground="Gray"/>
+        </StackPanel>
+
+        <!-- Data Grid -->
+        <DataGrid Grid.Row="1" x:Name="dataGrid" AutoGenerateColumns="False" 
+                  IsReadOnly="True" AlternatingRowBackground="#F5F5F5"
+                  CanUserSortColumns="True" CanUserResizeColumns="True">
+            <DataGrid.Columns>
+                <!-- Person Info -->
+                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="150"/>
+                <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="180"/>
+                <DataGridTextColumn Header="Phone" Binding="{Binding Phone}" Width="120"/>
+                <DataGridTextColumn Header="Birthday" Binding="{Binding Birthday, StringFormat=d}" Width="90"/>
+
+                <!-- Pool Access (12-14) -->
+                <DataGridTemplateColumn Header="Pool Access" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding PoolAccessStatus}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PoolAccessStatus}" Value="Active">
+                                                <Setter Property="Foreground" Value="Green"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PoolAccessStatus}" Value="Scheduled">
+                                                <Setter Property="Foreground" Value="Blue"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PoolAccessStatus}" Value="Expired">
+                                                <Setter Property="Foreground" Value="Gray"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Pool Start" Binding="{Binding PoolAccessStart, StringFormat=d}" Width="90"/>
+                <DataGridTextColumn Header="Pool End" Binding="{Binding PoolAccessEnd, StringFormat=d}" Width="90"/>
+
+                <!-- Pool + Gym Access (14-18) -->
+                <DataGridTemplateColumn Header="Pool+Gym Access" Width="120">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding PoolGymAccessStatus}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding PoolGymAccessStatus}" Value="Active">
+                                                <Setter Property="Foreground" Value="Green"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PoolGymAccessStatus}" Value="Scheduled">
+                                                <Setter Property="Foreground" Value="Blue"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding PoolGymAccessStatus}" Value="Expired">
+                                                <Setter Property="Foreground" Value="Gray"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Pool+Gym Start" Binding="{Binding PoolGymAccessStart, StringFormat=d}" Width="100"/>
+                <DataGridTextColumn Header="Pool+Gym End" Binding="{Binding PoolGymAccessEnd, StringFormat=d}" Width="100"/>
+
+                <!-- All Access (18+) -->
+                <DataGridTemplateColumn Header="All Access" Width="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding AllAccessStatus}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding AllAccessStatus}" Value="Active">
+                                                <Setter Property="Foreground" Value="Green"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding AllAccessStatus}" Value="Scheduled">
+                                                <Setter Property="Foreground" Value="Blue"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="All Access Start" Binding="{Binding AllAccessStart, StringFormat=d}" Width="110"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <StackPanel Orientation="Horizontal" Margin="0,0,20,0">
+                <TextBlock Text="Legend: " FontWeight="Bold"/>
+                <TextBlock Text="Active" Foreground="Green" FontWeight="Bold" Margin="5,0,10,0"/>
+                <TextBlock Text="Scheduled" Foreground="Blue" Margin="0,0,10,0"/>
+                <TextBlock Text="Expired" Foreground="Gray"/>
+            </StackPanel>
+            <Button x:Name="btnClose" Content="Close" Width="80" Height="30" Click="BtnClose_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

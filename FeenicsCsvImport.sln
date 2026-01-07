@@ -5,6 +5,12 @@ VisualStudioVersion = 17.14.36221.1 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeenicsCsvImport", "FeenicsCsvImport\FeenicsCsvImport.csproj", "{62E42D2E-865A-48E3-8C5D-1F46FC794A21}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeenicsCsvImport.Gui", "FeenicsCsvImport.Gui\FeenicsCsvImport.Gui.csproj", "{2792034C-D7D3-459A-A1C7-4FB251A4EF49}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeenicsCsvImport.ClassLibrary", "FeenicsCsvImport.ClassLibrary\FeenicsCsvImport.ClassLibrary.csproj", "{2A2BBF26-2BD7-446D-82B3-8DEBE0BA9245}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FeenicsCsvImport.Test", "FeenicsCsvImport.Test\FeenicsCsvImport.Test.csproj", "{7FE57481-6863-4148-9E58-C554F4A975FC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +21,18 @@ Global
 		{62E42D2E-865A-48E3-8C5D-1F46FC794A21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{62E42D2E-865A-48E3-8C5D-1F46FC794A21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{62E42D2E-865A-48E3-8C5D-1F46FC794A21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2792034C-D7D3-459A-A1C7-4FB251A4EF49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2792034C-D7D3-459A-A1C7-4FB251A4EF49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2792034C-D7D3-459A-A1C7-4FB251A4EF49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2792034C-D7D3-459A-A1C7-4FB251A4EF49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A2BBF26-2BD7-446D-82B3-8DEBE0BA9245}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A2BBF26-2BD7-446D-82B3-8DEBE0BA9245}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A2BBF26-2BD7-446D-82B3-8DEBE0BA9245}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A2BBF26-2BD7-446D-82B3-8DEBE0BA9245}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FE57481-6863-4148-9E58-C554F4A975FC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FE57481-6863-4148-9E58-C554F4A975FC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FE57481-6863-4148-9E58-C554F4A975FC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FE57481-6863-4148-9E58-C554F4A975FC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
