@@ -49,7 +49,7 @@ The rules grid defines which Feenics access levels to assign and the age range f
 2. Click **Load from Instance**
 3. A picker dialog appears showing all access levels defined in your instance
 4. Select the ones you want and click OK
-5. They are added to the rules grid with Start Age = 0 and End Age = blank — fill in the appropriate age ranges
+5. They are added to the rules grid with Start Age = 0 and End Age = blank â€” fill in the appropriate age ranges
 
 ### Editing Rules
 
@@ -87,7 +87,7 @@ Replace the sample rows with your real data and keep the header row.
 1. Select a CSV file with **Browse**
 2. Click **Preview**
 3. A preview window shows each person with their calculated access levels, dates, and statuses (Scheduled / Active / Expired)
-4. Review the data before importing — no API calls are made during preview
+4. Review the data before importing â€” no API calls are made during preview
 
 ## Running the Import
 

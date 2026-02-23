@@ -4,7 +4,7 @@
 
 - **Encoding**: UTF-8 (with or without BOM)
 - **Delimiter**: Comma (`,`)
-- **Header row**: Required — must be the first row
+- **Header row**: Required â€” must be the first row
 - **Quoting**: Values containing commas must be enclosed in double quotes
 
 ## Required Columns
@@ -21,18 +21,18 @@
 
 The `Birthday` column is parsed using `CultureInfo.InvariantCulture`. Common accepted formats:
 
-- `MM/dd/yyyy` — `03/15/2010`
-- `yyyy-MM-dd` — `2010-03-15`
-- `M/d/yyyy` — `3/15/2010`
+- `MM/dd/yyyy` â€” `03/15/2010`
+- `yyyy-MM-dd` â€” `2010-03-15`
+- `M/d/yyyy` â€” `3/15/2010`
 
 ## Address Parsing
 
 The `Address` column is parsed from right to left:
 
-1. **Postal code** — 5-digit US zip (`62701`), zip+4 (`62701-1234`), or Canadian postal code (`M5V 2T6`)
-2. **State/Province** — 2-letter abbreviation (`IL`, `ON`)
-3. **City** — text after the last remaining comma
-4. **Street** — everything before the city
+1. **Postal code** â€” 5-digit US zip (`62701`), zip+4 (`62701-1234`), or Canadian postal code (`M5V 2T6`)
+2. **State/Province** â€” 2-letter abbreviation (`IL`, `ON`)
+3. **City** â€” text after the last remaining comma
+4. **Street** â€” everything before the city
 
 ### Examples
 
@@ -54,7 +54,7 @@ Bob Johnson,"789 Elm Blvd, Denver, CO 80202",555-456-7890,bob.j@example.com,11/3
 
 ## Tips
 
-- Close the CSV file in Excel before importing — Excel locks files and the import will fail with a "file in use" error
-- Ensure names are consistent — duplicate detection matches on the exact `Name` value
+- Close the CSV file in Excel before importing â€” Excel locks files and the import will fail with a "file in use" error
+- Ensure names are consistent â€” duplicate detection matches on the exact `Name` value
 - Empty rows at the end of the file are ignored
 - Extra columns beyond the five defined columns are ignored

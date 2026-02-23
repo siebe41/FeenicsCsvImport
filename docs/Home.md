@@ -1,13 +1,13 @@
-# Feenics CSV Import — Wiki
+# Feenics CSV Import â€” Wiki
 
 Welcome to the Feenics CSV Import wiki. This tool bulk-imports people from CSV files into the Feenics (Acre Security) cloud access control platform and assigns scheduled access levels based on age.
 
 ## Pages
 
-- [User Guide](User-Guide.md) — step-by-step instructions for using the application
-- [CSV Specification](CSV-Specification.md) — detailed format requirements for the import file
-- [Access Level Rules](Access-Level-Rules.md) — how age-based scheduling works
-- [Troubleshooting](Troubleshooting.md) — common errors and how to resolve them
+- [User Guide](User-Guide.md) â€” step-by-step instructions for using the application
+- [CSV Specification](CSV-Specification.md) â€” detailed format requirements for the import file
+- [Access Level Rules](Access-Level-Rules.md) â€” how age-based scheduling works
+- [Troubleshooting](Troubleshooting.md) â€” common errors and how to resolve them
 
 ## Quick Start
 

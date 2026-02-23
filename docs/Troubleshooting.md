@@ -26,7 +26,7 @@
 
 **Fix**:
 - Verify the API URL (default: `https://api.us.acresecurity.cloud`)
-- Check the instance name — this is case-sensitive
+- Check the instance name â€” this is case-sensitive
 - Re-enter the password (it is not saved between sessions)
 
 ---
@@ -56,7 +56,7 @@
 
 **Cause**: A person was created in the batch but couldn't be found when querying back for access level assignment. This can happen if the API has propagation delay.
 
-**Fix**: This is logged as a warning. The person was likely created successfully — run the import again with **Skip** mode to assign access levels to anyone who was missed.
+**Fix**: This is logged as a warning. The person was likely created successfully â€” run the import again with **Skip** mode to assign access levels to anyone who was missed.
 
 ---
 
@@ -64,7 +64,7 @@
 
 **Cause**: The End Age was set to `0` instead of being left blank. In earlier versions this caused both dates to be the DOB.
 
-**Fix**: This was fixed — End Age of `0` is now treated as blank (permanent access). Clear the End Age cell or leave it empty.
+**Fix**: This was fixed â€” End Age of `0` is now treated as blank (permanent access). Clear the End Age cell or leave it empty.
 
 ---
 
@@ -84,7 +84,7 @@ The log panel shows detailed timestamped output. Lines prefixed with `DEBUG:` in
 Saved at `%AppData%\FeenicsCsvImport\settings.json`. If the application fails to start or loads unexpected settings, you can:
 1. Close the application
 2. Delete or rename the settings file
-3. Relaunch — default settings will be regenerated
+3. Relaunch â€” default settings will be regenerated
 
 ### Reporting Issues
 

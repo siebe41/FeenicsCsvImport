@@ -5,8 +5,8 @@
 Access level rules map a person's age to Feenics access levels. Each rule defines:
 
 - A **Feenics access level name** to assign
-- A **Start Age** — the age at which access activates
-- An **End Age** — the age at which access expires (blank = permanent)
+- A **Start Age** â€” the age at which access activates
+- An **End Age** â€” the age at which access expires (blank = permanent)
 
 During import, every rule is evaluated for every person. The person's date of birth is used to calculate concrete dates.
 
@@ -29,11 +29,11 @@ For a person born on `2012-06-15` with the default rules:
 
 ## Automatic Skip for Expired Rules
 
-If a rule's calculated ExpiresOn date is in the past for a given person, it is **automatically skipped** and not sent to the API. This means an adult being imported won't get a "pool only ages 12–14" assignment that already expired years ago.
+If a rule's calculated ExpiresOn date is in the past for a given person, it is **automatically skipped** and not sent to the API. This means an adult being imported won't get a "pool only ages 12â€“14" assignment that already expired years ago.
 
 ## End Age of 0 or Blank
 
-Both `null` (blank) and `0` are treated the same — the rule is considered **permanent** (no expiry). The display shows `18+` instead of `18-0`.
+Both `null` (blank) and `0` are treated the same â€” the rule is considered **permanent** (no expiry). The display shows `18+` instead of `18-0`.
 
 When sent to the Feenics API, a concrete ExpiresOn date is required. Permanent rules use **50 years from the current date** as the expiration.
 
