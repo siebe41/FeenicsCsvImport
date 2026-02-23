@@ -15,26 +15,26 @@ The application connects to the Feenics Keep API, creates person records, and as
 ## Features
 
 - **WPF GUI** with connection settings, rule editor, CSV preview, progress bar, and detailed log output
-- **CSV template export** — generate a blank CSV with the correct headers and sample data
-- **Configurable access level rules** — define any number of rules mapping age ranges to Feenics access levels
-- **Load access levels from instance** — fetch existing access levels from your Feenics instance and add them as rules
-- **Auto-create access levels** — optionally create access levels in Feenics if they don't already exist
-- **Duplicate handling** — choose how to handle people who already exist in Feenics:
-  - **Skip** — leave existing people untouched (default)
-  - **Update** — overwrite the existing person's data with CSV values
-  - **Create new** — always create a new record (with duplicate warning)
-- **Paginated people lookup** — correctly detects existing people even in large instances
-- **Preview window** — review calculated access dates and statuses before importing
-- **Rate-limit retry** — automatic exponential backoff with jitter on HTTP 429 responses
-- **Persistent settings** — connection details, rules, and preferences are saved to `%AppData%\FeenicsCsvImport\settings.json` (password is never saved)
-- **Cancellation support** — cancel a running import at any time
+- **CSV template export** â€” generate a blank CSV with the correct headers and sample data
+- **Configurable access level rules** â€” define any number of rules mapping age ranges to Feenics access levels
+- **Load access levels from instance** â€” fetch existing access levels from your Feenics instance and add them as rules
+- **Auto-create access levels** â€” optionally create access levels in Feenics if they don't already exist
+- **Duplicate handling** â€” choose how to handle people who already exist in Feenics:
+  - **Skip** â€” leave existing people untouched (default)
+  - **Update** â€” overwrite the existing person's data with CSV values
+  - **Create new** â€” always create a new record (with duplicate warning)
+- **Paginated people lookup** â€” correctly detects existing people even in large instances
+- **Preview window** â€” review calculated access dates and statuses before importing
+- **Rate-limit retry** â€” automatic exponential backoff with jitter on HTTP 429 responses
+- **Persistent settings** â€” connection details, rules, and preferences are saved to `%AppData%\FeenicsCsvImport\settings.json` (password is never saved)
+- **Cancellation support** â€” cancel a running import at any time
 
 ## Solution Structure
 
 | Project | Description |
 |---|---|
 | **FeenicsCsvImport.Gui** | WPF desktop application (main entry point) |
-| **FeenicsCsvImport.ClassLibrary** | Core logic — CSV parsing, API interaction, access level scheduling |
+| **FeenicsCsvImport.ClassLibrary** | Core logic â€” CSV parsing, API interaction, access level scheduling |
 | **FeenicsCsvImport** | Console application for headless/scripted imports |
 | **FeenicsCsvImport.Test** | Unit tests (MSTest) |
 
@@ -66,15 +66,15 @@ Rules are defined in the application's rule grid and determine which Feenics acc
 |---|---|
 | **Access Level Name** | Must match an existing Feenics access level name (or check **Create** to auto-create it) |
 | **Start Age** | Age (in years) when this access level becomes active |
-| **End Age** | Age when this access level expires — leave blank for permanent access |
+| **End Age** | Age when this access level expires â€” leave blank for permanent access |
 | **Create** | If checked, the access level will be created in Feenics if it doesn't already exist |
 
 ### Default Rules
 
 | Access Level Name | Start Age | End Age | Notes |
 |---|---|---|---|
-| `PoolOnlyAccess-Age12` | 12 | 14 | Pool only for ages 12–14 |
-| `PoolAndGymAccess-Age14` | 14 | 18 | Pool and gym for ages 14–18 |
+| `PoolOnlyAccess-Age12` | 12 | 14 | Pool only for ages 12â€“14 |
+| `PoolAndGymAccess-Age14` | 14 | 18 | Pool and gym for ages 14â€“18 |
 | `PoolAndGymAfterHoursAccess-Age18` | 18 | *(blank)* | Full access from age 18, permanent |
 
 ### How Scheduling Works
@@ -88,8 +88,16 @@ Rules where the expiration date has already passed are automatically skipped.
 
 ## Getting Started
 
+### Using Source Code
 1. **Build** the solution in Visual Studio (requires .NET Framework 4.8 targeting pack)
 2. **Run** `FeenicsCsvImport.Gui`
+
+
+### Downloading Release
+1. Download the latest release from the right hand menu and extract the files
+2. **Run** `FeenicsCsvImport.Gui.exe`
+
+### Both approaches
 3. Enter your **API URL**, **Instance**, **Username**, and **Password**
 4. Configure **access level rules** (or use the defaults, or click **Load from Instance** to fetch existing ones)
 5. Click **Export Template** to get a blank CSV, then fill it in with your member data
@@ -110,12 +118,12 @@ This includes API URL, instance name, username, duplicate handling preference, a
 ## Import Process
 
 1. **Authenticate** with the Feenics API
-2. **Resolve access levels** — match rule names to existing access levels (or create missing ones)
+2. **Resolve access levels** â€” match rule names to existing access levels (or create missing ones)
 3. **Read CSV** and parse all records
-4. **Check for duplicates** — paginate through all existing people in the instance
+4. **Check for duplicates** â€” paginate through all existing people in the instance
 5. **Create or update people** based on the selected duplicate handling mode
-6. **Assign scheduled access levels** — for each person and each rule, calculate the date range and call the API
-7. **Report results** — summary of created, updated, assigned, skipped, and failed records
+6. **Assign scheduled access levels** â€” for each person and each rule, calculate the date range and call the API
+7. **Report results** â€” summary of created, updated, assigned, skipped, and failed records
 
 ## Running Tests
 
