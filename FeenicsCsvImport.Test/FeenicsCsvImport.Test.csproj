@@ -42,8 +42,8 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UnitTest1.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="MSTest.TestAdapter">
@@ -52,6 +52,20 @@
     <PackageReference Include="MSTest.TestFramework">
       <Version>2.2.10</Version>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FeenicsCsvImport.ClassLibrary\FeenicsCsvImport.ClassLibrary.csproj">
+      <Project>{2a2bbf26-2bd7-446d-82b3-8debe0ba9245}</Project>
+      <Name>FeenicsCsvImport.ClassLibrary</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\FeenicsCsvImport.Gui\FeenicsCsvImport.Gui.csproj">
+      <Project>{2792034c-d7d3-459a-a1c7-4fb251a4ef49}</Project>
+      <Name>FeenicsCsvImport.Gui</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\FeenicsCsvImport\FeenicsCsvImport.csproj">
+      <Project>{62e42d2e-865a-48e3-8c5d-1f46fc794a21}</Project>
+      <Name>FeenicsCsvImport</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

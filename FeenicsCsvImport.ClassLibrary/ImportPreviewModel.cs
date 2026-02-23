@@ -1,7 +1,20 @@
 using System;
+using System.Collections.Generic;
 
 namespace FeenicsCsvImport.ClassLibrary
 {
+    /// <summary>
+    /// Represents the calculated status and dates for a single access level rule applied to a user.
+    /// </summary>
+    public class AccessLevelPreview
+    {
+        public string RuleName { get; set; }
+        public string AgeRange { get; set; }
+        public string Status { get; set; }
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
     /// <summary>
     /// Model for previewing import data with calculated access levels
     /// </summary>
@@ -13,29 +26,17 @@ namespace FeenicsCsvImport.ClassLibrary
         public string Address { get; set; }
         public DateTime Birthday { get; set; }
 
-        // Pool Access (Age 12-14)
-        public string PoolAccessStatus { get; set; }
-        public DateTime? PoolAccessStart { get; set; }
-        public DateTime? PoolAccessEnd { get; set; }
-
-        // Pool + Gym Access (Age 14-18)
-        public string PoolGymAccessStatus { get; set; }
-        public DateTime? PoolGymAccessStart { get; set; }
-        public DateTime? PoolGymAccessEnd { get; set; }
-
-        // All Access (Age 18+)
-        public string AllAccessStatus { get; set; }
-        public DateTime? AllAccessStart { get; set; }
+        /// <summary>
+        /// Calculated access level previews, one per rule.
+        /// </summary>
+        public List<AccessLevelPreview> AccessLevels { get; set; } = new List<AccessLevelPreview>();
 
         /// <summary>
-        /// Creates a preview model from a CSV record with calculated access dates
+        /// Creates a preview model from a CSV record with calculated access dates based on the provided rules.
         /// </summary>
-        public static ImportPreviewModel FromCsvRecord(UserCsvModel record)
+        public static ImportPreviewModel FromCsvRecord(UserCsvModel record, IList<AccessLevelRule> rules)
         {
             DateTime dob = record.Birthday;
-            DateTime age12 = dob.AddYears(12);
-            DateTime age14 = dob.AddYears(14);
-            DateTime age18 = dob.AddYears(18);
             DateTime now = DateTime.UtcNow;
 
             var preview = new ImportPreviewModel
@@ -47,48 +48,34 @@ namespace FeenicsCsvImport.ClassLibrary
                 Birthday = record.Birthday
             };
 
-            // Pool Access (12-14)
-            if (age14 <= now)
+            foreach (var rule in rules)
             {
-                preview.PoolAccessStatus = "Expired";
-            }
-            else if (age12 <= now)
-            {
-                preview.PoolAccessStatus = "Active";
-            }
-            else
-            {
-                preview.PoolAccessStatus = "Scheduled";
-            }
-            preview.PoolAccessStart = age12;
-            preview.PoolAccessEnd = age14;
+                DateTime activeOn = rule.GetActiveOn(dob);
+                DateTime? expiresOn = rule.GetExpiresOn(dob);
 
-            // Pool + Gym Access (14-18)
-            if (age18 <= now)
-            {
-                preview.PoolGymAccessStatus = "Expired";
-            }
-            else if (age14 <= now)
-            {
-                preview.PoolGymAccessStatus = "Active";
-            }
-            else
-            {
-                preview.PoolGymAccessStatus = "Scheduled";
-            }
-            preview.PoolGymAccessStart = age14;
-            preview.PoolGymAccessEnd = age18;
+                string status;
+                if (expiresOn.HasValue && expiresOn.Value <= now)
+                {
+                    status = "Expired";
+                }
+                else if (activeOn <= now)
+                {
+                    status = "Active";
+                }
+                else
+                {
+                    status = "Scheduled";
+                }
 
-            // All Access (18+)
-            if (age18 <= now)
-            {
-                preview.AllAccessStatus = "Active";
+                preview.AccessLevels.Add(new AccessLevelPreview
+                {
+                    RuleName = rule.Name,
+                    AgeRange = rule.AgeRangeDisplay,
+                    Status = status,
+                    Start = activeOn,
+                    End = expiresOn
+                });
             }
-            else
-            {
-                preview.AllAccessStatus = "Scheduled";
-            }
-            preview.AllAccessStart = age18;
 
             return preview;
         }

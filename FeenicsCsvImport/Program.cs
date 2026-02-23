@@ -27,9 +27,13 @@ namespace FeenicsCsvImport
                 Instance = "YOUR_INSTANCE",
                 Username = "YOUR_USER",
                 Password = "YOUR_PASS",
-                PoolAccessLevelName = "PoolOnlyAccess-Age12",
-                PoolGymAccessLevelName = "PoolAndGymAccess-Age14",
-                AllAccessLevelName = "PoolAndGymAfterHoursAccess-Age18",
+                DuplicateHandling = DuplicateHandling.Skip,
+                AccessLevelRules = new List<AccessLevelRule>
+                {
+                    new AccessLevelRule { Name = "PoolOnlyAccess-Age12", StartAge = 12, EndAge = 14, CreateIfMissing = false },
+                    new AccessLevelRule { Name = "PoolAndGymAccess-Age14", StartAge = 14, EndAge = 18, CreateIfMissing = false },
+                    new AccessLevelRule { Name = "PoolAndGymAfterHoursAccess-Age18", StartAge = 18, EndAge = null, CreateIfMissing = false }
+                },
                 ApiCallDelayMs = 100,
                 MaxRetries = 5,
                 InitialRetryDelayMs = 1000,
@@ -47,6 +51,7 @@ namespace FeenicsCsvImport
             Console.WriteLine("=== Import Summary ===");
             Console.WriteLine($"Success: {result.Success}");
             Console.WriteLine($"People Created: {result.PeopleCreated}");
+            Console.WriteLine($"People Updated: {result.PeopleUpdated}");
             Console.WriteLine($"Access Levels Assigned: {result.AccessLevelsAssigned}");
 
             if (result.Errors.Count > 0)

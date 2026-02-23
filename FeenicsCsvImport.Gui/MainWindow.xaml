@@ -5,10 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FeenicsCsvImport.Gui"
         mc:Ignorable="d"
-        Title="Feenics CSV Import" Height="600" Width="900"
-        WindowStartupLocation="CenterScreen">
+        Title="Feenics CSV Import" Height="750" Width="900"
+        WindowStartupLocation="CenterScreen"
+        Icon="Images/mainicon.png">
     <Grid Margin="10">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -18,7 +20,10 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <TextBlock Grid.Row="0" Text="Feenics CSV User Import" FontSize="24" FontWeight="Bold" Margin="0,0,0,15"/>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
+            <Image Source="Images/icon.png" Width="32" Height="32" Margin="0,0,10,0" VerticalAlignment="Center"/>
+            <TextBlock Text="Feenics CSV User Import" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
 
         <!-- Connection Settings -->
         <GroupBox Grid.Row="1" Header="Connection Settings" Margin="0,0,0,10">
@@ -32,6 +37,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="API URL:" VerticalAlignment="Center" Margin="0,0,10,5"/>
@@ -40,31 +46,78 @@
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="Instance:" VerticalAlignment="Center" Margin="0,0,10,5"/>
                 <TextBox Grid.Row="0" Grid.Column="3" x:Name="txtInstance" Margin="0,0,0,5"/>
 
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Username:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtUsername" Margin="0,0,20,0"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Username:" VerticalAlignment="Center" Margin="0,0,10,5"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtUsername" Margin="0,0,20,5"/>
 
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="Password:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <PasswordBox Grid.Row="1" Grid.Column="3" x:Name="txtPassword"/>
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="Password:" VerticalAlignment="Center" Margin="0,0,10,5"/>
+                <PasswordBox Grid.Row="1" Grid.Column="3" x:Name="txtPassword" Margin="0,0,0,5"/>
+
+                <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Margin="0,2,0,0">
+                    <TextBlock Text="If person exists:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="rbSkip" Content="Skip" GroupName="DuplicateHandling" 
+                                 IsChecked="True" VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <RadioButton x:Name="rbUpdate" Content="Update existing" GroupName="DuplicateHandling"
+                                 VerticalAlignment="Center" Margin="0,0,15,0"/>
+                    <RadioButton x:Name="rbCreateNew" Content="Create new (may duplicate)" GroupName="DuplicateHandling"
+                                 VerticalAlignment="Center" Margin="0,0,0,0" Foreground="#C56000"/>
+                </StackPanel>
+                <Button Grid.Row="2" Grid.Column="3" x:Name="btnSaveSettings" Content="Save Settings" 
+                        HorizontalAlignment="Right" Width="100" Click="BtnSaveSettings_Click"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- Access Level Rules -->
+        <GroupBox Grid.Row="2" Header="Access Level Rules" Margin="0,0,0,10">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <DataGrid Grid.Row="0" x:Name="dgRules" AutoGenerateColumns="False" 
+                          CanUserAddRows="True" CanUserDeleteRows="True"
+                          Height="140" VerticalScrollBarVisibility="Auto"
+                          AlternatingRowBackground="#F5F5F5">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Access Level Name" Binding="{Binding Name}" Width="*" />
+                        <DataGridTextColumn Header="Start Age" Binding="{Binding StartAge}" Width="80" />
+                        <DataGridTextColumn Header="End Age" Binding="{Binding EndAge}" Width="80" />
+                        <DataGridCheckBoxColumn Header="Create" Binding="{Binding CreateIfMissing}" Width="60" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,6,0,0">
+                    <Button x:Name="btnLoadAccessLevels" Content="Load from Instance" 
+                            Width="140" Height="26" Click="BtnLoadAccessLevels_Click"/>
+                    <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Foreground="Gray" FontSize="11"
+                               Text="Fetch existing access levels from Feenics and add them as rules."/>
+                </StackPanel>
+
+                <TextBlock Grid.Row="2" Margin="0,4,0,0" Foreground="Gray" FontSize="11"
+                           Text="Define access levels and age ranges. Leave 'End Age' blank for permanent access. Check 'Create' to auto-create the access level in Feenics if it doesn't exist."/>
             </Grid>
         </GroupBox>
 
         <!-- File Selection -->
-        <GroupBox Grid.Row="2" Header="CSV File" Margin="0,0,0,10">
+        <GroupBox Grid.Row="3" Header="CSV File" Margin="0,0,0,10">
             <Grid Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <TextBox Grid.Column="0" x:Name="txtCsvFile" IsReadOnly="True" Margin="0,0,10,0"/>
                 <Button Grid.Column="1" x:Name="btnBrowse" Content="Browse..." Width="80" Click="BtnBrowse_Click" Margin="0,0,10,0"/>
-                <Button Grid.Column="2" x:Name="btnPreview" Content="Preview" Width="80" Click="BtnPreview_Click" IsEnabled="False"/>
+                <Button Grid.Column="2" x:Name="btnPreview" Content="Preview" Width="80" Click="BtnPreview_Click" IsEnabled="False" Margin="0,0,10,0"/>
+                <Button Grid.Column="3" x:Name="btnExportTemplate" Content="Export Template" Width="110" Click="BtnExportTemplate_Click"/>
             </Grid>
         </GroupBox>
 
         <!-- Log Output -->
-        <GroupBox Grid.Row="3" Header="Log">
+        <GroupBox Grid.Row="4" Header="Log">
             <ScrollViewer x:Name="logScrollViewer" VerticalScrollBarVisibility="Auto">
                 <TextBox x:Name="txtLog" IsReadOnly="True" TextWrapping="Wrap" 
                          VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11"
@@ -73,7 +126,7 @@
         </GroupBox>
 
         <!-- Progress -->
-        <Grid Grid.Row="4" Margin="0,10,0,10">
+        <Grid Grid.Row="5" Margin="0,10,0,10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -83,7 +136,7 @@
         </Grid>
 
         <!-- Action Buttons -->
-        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="btnImport" Content="Start Import" Width="120" Height="35" 
                     Click="BtnImport_Click" IsEnabled="False" Margin="0,0,10,0"
                     Background="#4CAF50" Foreground="White" FontWeight="Bold"/>
