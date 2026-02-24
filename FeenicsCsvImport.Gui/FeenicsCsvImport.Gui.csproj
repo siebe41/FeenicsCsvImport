@@ -198,9 +198,16 @@
     </PropertyGroup>
     <Message Importance="high" Text="GitVersion SemVer: $(GitVersion_SemVer)" />
   </Target>
-
+  <!-- Tag and push version after successful Release build -->
+  <Target Name="GitTagAndPush" AfterTargets="PackageZip" Condition="'$(Configuration)' == 'Release'">
+    <!-- Only tag if the tag doesn't already exist -->
+    <Exec Command="git tag v$(GitVersion_SemVer)" IgnoreExitCode="true" />
+    <Exec Command="git push origin v$(GitVersion_SemVer)" IgnoreExitCode="true" />
+    <Message Importance="high" Text="Tagged and pushed: v$(GitVersion_SemVer)" />
+  </Target>
   <!-- Package zip in Release builds -->
   <Target Name="PackageZip" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+  
     <PropertyGroup>
       <ZipStagingDir>$(OutputPath)ZipStaging\</ZipStagingDir>
       <ZipVersionSuffix Condition="'$(GitVersion_SemVer)' != ''">-$(GitVersion_SemVer)</ZipVersionSuffix>
