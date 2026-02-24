@@ -363,6 +363,90 @@ namespace FeenicsCsvImport.Gui
             LogMessage("Cancellation requested...");
         }
 
+        private async void BtnDeleteAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtApiUrl.Text) ||
+                string.IsNullOrWhiteSpace(txtInstance.Text) ||
+                string.IsNullOrWhiteSpace(txtUsername.Text) ||
+                string.IsNullOrWhiteSpace(txtPassword.Password))
+            {
+                MessageBox.Show("Please enter API URL, Instance, Username, and Password.", "Missing Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm1 = MessageBox.Show(
+                "This will permanently delete ALL people from the Feenics instance.\n\nThis action cannot be undone.\n\nAre you sure you want to continue?",
+                "Delete All People", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm1 != MessageBoxResult.Yes)
+                return;
+
+            var confirm2 = MessageBox.Show(
+                $"You are about to delete ALL people from instance \"{txtInstance.Text}\".\n\nType-to-confirm: Click YES to proceed with deletion.",
+                "Final Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Stop);
+            if (confirm2 != MessageBoxResult.Yes)
+                return;
+
+            SetUIEnabled(false);
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            try
+            {
+                var config = CreateConfiguration();
+                var service = new ImportService(config, LogMessage);
+
+                var progress = new Progress<ImportProgress>(p =>
+                {
+                    progressBar.Value = p.CurrentStep;
+                    txtProgress.Text = p.Message;
+                });
+
+                LogMessage("Starting delete all people...");
+                var (deleted, failed, errors) = await service.DeleteAllPeopleAsync(progress, _cancellationTokenSource.Token);
+
+                LogMessage("");
+                LogMessage("=== Delete Summary ===");
+                LogMessage($"Deleted: {deleted}");
+                LogMessage($"Failed: {failed}");
+
+                if (errors.Count > 0)
+                {
+                    LogMessage("");
+                    LogMessage("Errors:");
+                    foreach (var error in errors)
+                    {
+                        LogMessage($"  - {error}");
+                    }
+                }
+
+                if (failed == 0)
+                {
+                    MessageBox.Show($"Successfully deleted {deleted} people.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Deleted {deleted} people. {failed} failed. Check the log for details.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                LogMessage("Delete was cancelled by user.");
+                MessageBox.Show("Delete was cancelled.", "Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                var details = ImportService.FormatExceptionDetails(ex);
+                LogMessage($"Delete failed: {ex.Message}");
+                LogMessage($"  {details}");
+                MessageBox.Show($"Delete failed: {ex.Message}\n\nCheck the log for full details.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetUIEnabled(true);
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
+            }
+        }
+
         private ImportConfiguration CreateConfiguration()
         {
             var config = new ImportConfiguration
@@ -401,6 +485,7 @@ namespace FeenicsCsvImport.Gui
             btnBrowse.IsEnabled = enabled;
             btnPreview.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
             btnImport.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
+            btnDeleteAll.IsEnabled = enabled;
             btnCancel.IsEnabled = !enabled;
             txtApiUrl.IsEnabled = enabled;
             txtInstance.IsEnabled = enabled;

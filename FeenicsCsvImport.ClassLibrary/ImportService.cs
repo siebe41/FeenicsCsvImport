@@ -111,12 +111,16 @@ namespace FeenicsCsvImport.ClassLibrary
         }
 
         /// <summary>
-        /// Reads and parses a CSV file, returning preview models
+        /// Reads and parses a CSV file, returning preview models.
+        /// Records missing Name or Address are excluded.
         /// </summary>
         public List<ImportPreviewModel> LoadCsvForPreview(string csvFilePath)
         {
             var records = ReadCsvFile(csvFilePath);
-            return records.Select(r => ImportPreviewModel.FromCsvRecord(r, _config.AccessLevelRules)).ToList();
+            return records
+                .Where(r => !string.IsNullOrWhiteSpace(r.Name) && !string.IsNullOrWhiteSpace(r.Address))
+                .Select(r => ImportPreviewModel.FromCsvRecord(r, _config.AccessLevelRules))
+                .ToList();
         }
 
         /// <summary>
@@ -289,8 +293,38 @@ namespace FeenicsCsvImport.ClassLibrary
                 // 2. Read CSV
                 ReportProgress(progress, "Reading CSV file...", 10);
                 Log("Reading CSV file...");
-                var records = ReadCsvFile(csvFilePath);
-                Log($"DEBUG: Read {records.Count} records from CSV");
+                var allRecords = ReadCsvFile(csvFilePath);
+                Log($"DEBUG: Read {allRecords.Count} records from CSV");
+
+                // Validate records - skip rows missing Name or Address
+                var records = new List<UserCsvModel>();
+                int skippedEmpty = 0;
+                for (int i = 0; i < allRecords.Count; i++)
+                {
+                    var r = allRecords[i];
+                    if (string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Address))
+                    {
+                        skippedEmpty++;
+                        var reason = string.IsNullOrWhiteSpace(r.Name) ? "missing Name" : "missing Address";
+                        Log($"Skipping CSV row {i + 1}: {reason} (Name='{r.Name ?? ""}', Address='{r.Address ?? ""}')");
+                        result.Warnings.Add($"Skipped row {i + 1}: {reason}");
+                        continue;
+                    }
+                    records.Add(r);
+                }
+
+                if (skippedEmpty > 0)
+                {
+                    Log($"Skipped {skippedEmpty} record(s) with missing Name or Address.");
+                }
+
+                if (records.Count == 0)
+                {
+                    result.Errors.Add("No valid records found in CSV. Every row must have a Name and Address.");
+                    return result;
+                }
+
+                Log($"DEBUG: {records.Count} valid records to process");
 
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -401,72 +435,121 @@ namespace FeenicsCsvImport.ClassLibrary
                 // Update existing people
                 if (peopleToUpdate.Count > 0)
                 {
-                    Log($"Updating {peopleToUpdate.Count} existing people...");
+                    Log($"Updating {peopleToUpdate.Count} existing people (concurrency={_config.MaxConcurrency})...");
                     ReportProgress(progress, $"Updating {peopleToUpdate.Count} people...", 22);
+
+                    int updatedCount = 0;
+                    var updateSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+                    var updateTasks = new List<Task>();
+
                     foreach (var (existing, record) in peopleToUpdate)
                     {
-                        var nameParts = record.Name.Split(' ');
-                        existing.GivenName = nameParts[0];
-                        existing.Surname = nameParts.Length > 1 ? nameParts[1] : "";
-                        existing.Addresses = new AddressInfo[]
-                        {
-                            new PhoneInfo { Number = record.Phone, Type = "Mobile" },
-                            new EmailAddressInfo { MailTo = record.Email, Type = "Home" },
-                            ParseSingleStringAddress(record.Address)
-                        };
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await updateSemaphore.WaitAsync(cancellationToken);
 
-                        try
+                        var capturedExisting = existing;
+                        var capturedRecord = record;
+                        updateTasks.Add(Task.Run(async () =>
                         {
-                            await client.UpdatePersonAsync(existing);
-                            result.PeopleUpdated++;
-                            Log($"Updated '{record.Name}' (Key={existing.Key})");
-                        }
-                        catch (Exception ex)
-                        {
-                            var warning = $"Failed to update '{record.Name}': {ex.Message}";
-                            result.Warnings.Add(warning);
-                            Log($"Warning: {warning}");
-                        }
+                            try
+                            {
+                                var nameParts = capturedRecord.Name.Split(' ');
+                                capturedExisting.GivenName = nameParts[0];
+                                capturedExisting.Surname = nameParts.Length > 1 ? nameParts[1] : "";
+                                capturedExisting.Addresses = new AddressInfo[]
+                                {
+                                    new PhoneInfo { Number = capturedRecord.Phone, Type = "Mobile" },
+                                    new EmailAddressInfo { MailTo = capturedRecord.Email, Type = "Home" },
+                                    ParseSingleStringAddress(capturedRecord.Address)
+                                };
 
-                        await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+                                await ExecuteWithRetryAsync(
+                                    () => client.UpdatePersonAsync(capturedExisting),
+                                    $"Update '{capturedRecord.Name}'");
+                                Interlocked.Increment(ref updatedCount);
+                                Log($"Updated '{capturedRecord.Name}' (Key={capturedExisting.Key})");
+                            }
+                            catch (Exception ex)
+                            {
+                                var warning = $"Failed to update '{capturedRecord.Name}': {ex.Message}";
+                                lock (result.Warnings) { result.Warnings.Add(warning); }
+                                Log($"Warning: {warning}");
+                            }
+                            finally
+                            {
+                                updateSemaphore.Release();
+                            }
+                        }, cancellationToken));
                     }
+
+                    await Task.WhenAll(updateTasks);
+                    result.PeopleUpdated = updatedCount;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // 5. Query for all people to match records
-                ReportProgress(progress, "Retrieving people...", 30);
+                // 5. Query for all people to match records for access level assignment.
+                // Only needed for people that were just created or updated (not skipped).
+                ReportProgress(progress, "Retrieving people for access level assignment...", 30);
                 var matchedPeopleByName = new Dictionary<string, PersonInfo>();
-                var recordNames = new HashSet<string>(records.Select(r => r.Name));
-                page = 0;
-                while (true)
+
+                // For updates, we already have the PersonInfo objects
+                foreach (var (existing, record) in peopleToUpdate)
                 {
-                    var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
-                    if (peoplePage == null || !peoplePage.Any())
-                        break;
-
-                    foreach (var p in peoplePage)
-                    {
-                        if (recordNames.Contains(p.CommonName) && !matchedPeopleByName.ContainsKey(p.CommonName))
-                            matchedPeopleByName[p.CommonName] = p;
-                    }
-
-                    if (peoplePage.Count() < pageSize)
-                        break;
-
-                    page++;
-                    await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+                    if (!matchedPeopleByName.ContainsKey(record.Name))
+                        matchedPeopleByName[record.Name] = existing;
                 }
-                Log($"DEBUG: Retrieved and matched {matchedPeopleByName.Count} people by name");
 
-                // 6. Build access assignment tasks from rules
-                var accessAssignmentTasks = new List<(Func<Task> Action, string Description)>();
+                // For newly created people (and CreateNew duplicates), we need to query the API
+                var namesToFind = new HashSet<string>();
+                foreach (var record in records)
+                {
+                    if (skippedNames.Contains(record.Name))
+                        continue;
+                    if (matchedPeopleByName.ContainsKey(record.Name))
+                        continue;
+                    namesToFind.Add(record.Name);
+                }
+
+                if (namesToFind.Count > 0)
+                {
+                    Log($"Querying API for {namesToFind.Count} newly created people...");
+                    page = 0;
+                    while (true)
+                    {
+                        var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                        if (peoplePage == null || !peoplePage.Any())
+                            break;
+
+                        foreach (var p in peoplePage)
+                        {
+                            if (namesToFind.Contains(p.CommonName) && !matchedPeopleByName.ContainsKey(p.CommonName))
+                            {
+                                matchedPeopleByName[p.CommonName] = p;
+                                namesToFind.Remove(p.CommonName);
+                            }
+                        }
+
+                        // Stop early if we've found everyone we need
+                        if (namesToFind.Count == 0)
+                            break;
+
+                        if (peoplePage.Count() < pageSize)
+                            break;
+
+                        page++;
+                        await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+                    }
+                }
+                Log($"DEBUG: Matched {matchedPeopleByName.Count} people for access level assignment");
+
+                // 6. Build batched access assignments — one API call per person with all their link items
+                var perPersonAssignments = new List<(PersonInfo Person, List<ObjectLinkItem> LinkItems, string Description)>();
                 DateTime now = DateTime.UtcNow;
                 Log($"DEBUG: Current UTC time = {now:O}");
 
                 foreach (var record in records)
                 {
-                    // Skip access level assignments for users that were skipped during import
                     if (skippedNames.Contains(record.Name))
                     {
                         Log($"Skipping access level assignments for '{record.Name}' (user was skipped).");
@@ -481,8 +564,9 @@ namespace FeenicsCsvImport.ClassLibrary
                         continue;
                     }
 
-                    Log($"Queuing access assignments for {record.Name} (Key={person.Key})...");
                     DateTime dob = record.Birthday;
+                    var linkItems = new List<ObjectLinkItem>();
+                    var ruleDescs = new List<string>();
 
                     foreach (var rule in _config.AccessLevelRules)
                     {
@@ -492,61 +576,87 @@ namespace FeenicsCsvImport.ClassLibrary
 
                         Log($"DEBUG:   Rule '{rule.Name}' (Age {rule.AgeRangeDisplay}): ActiveOn={activeOn:yyyy-MM-dd}, ExpiresOn={expiresOn?.ToString("yyyy-MM-dd") ?? "none"}");
 
-                        // Skip rules where the end date has already passed
                         if (expiresOn.HasValue && expiresOn.Value <= now)
                         {
                             Log($"DEBUG:   Skipping '{rule.Name}' (expired: {expiresOn.Value:yyyy-MM-dd} <= now)");
                             continue;
                         }
 
-                        var p = person;
-                        var ao = activeOn;
-                        var eo = expiresOn;
-                        var al = accessLevel;
-                        var desc = expiresOn.HasValue
-                            ? $"{record.Name} - {rule.Name} (Start={activeOn:yyyy-MM-dd}, End={expiresOn.Value:yyyy-MM-dd})"
-                            : $"{record.Name} - {rule.Name} (Start={activeOn:yyyy-MM-dd})";
+                        var effectiveExpiresOn = expiresOn ?? DateTime.UtcNow.AddYears(50);
+                        var metaDoc = new BsonDocument
+                        {
+                            { "ActiveOn", new BsonDateTime(activeOn) },
+                            { "ExpiresOn", new BsonDateTime(effectiveExpiresOn) }
+                        };
 
-                        accessAssignmentTasks.Add((
-                            () => AssignScheduledAccessAsync(client, p, al, ao, eo),
-                            desc
-                        ));
+                        linkItems.Add(new ObjectLinkItem
+                        {
+                            LinkedObjectKey = accessLevel.Key,
+                            Relation = "ScheduledAccessLevel",
+                            MetaDataBson = metaDoc.ToBson()
+                        });
+
+                        ruleDescs.Add(expiresOn.HasValue
+                            ? $"{rule.Name} ({activeOn:yyyy-MM-dd} to {expiresOn.Value:yyyy-MM-dd})"
+                            : $"{rule.Name} ({activeOn:yyyy-MM-dd}+)");
+                    }
+
+                    if (linkItems.Count > 0)
+                    {
+                        var desc = $"{record.Name} [{linkItems.Count} rule(s): {string.Join(", ", ruleDescs)}]";
+                        perPersonAssignments.Add((person, linkItems, desc));
                     }
                 }
 
-                // 7. Execute access assignments with progress
-                int totalTasks = accessAssignmentTasks.Count;
-                Log($"Assigning {totalTasks} scheduled access levels...");
+                // 7. Execute batched access assignments in parallel
+                int totalPersons = perPersonAssignments.Count;
+                int totalRuleCount = perPersonAssignments.Sum(a => a.LinkItems.Count);
+                Log($"Assigning {totalRuleCount} scheduled access levels across {totalPersons} people (concurrency={_config.MaxConcurrency})...");
 
-                for (int i = 0; i < accessAssignmentTasks.Count; i++)
+                int completedPersons = 0;
+                int assignedCount = 0;
+                var assignSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+                var assignTasks = new List<Task>();
+
+                foreach (var (person, linkItems, description) in perPersonAssignments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    await assignSemaphore.WaitAsync(cancellationToken);
 
-                    var (action, description) = accessAssignmentTasks[i];
-                    int progressPercent = 30 + (int)((i / (double)totalTasks) * 70);
-
-                    ReportProgress(progress, $"Assigning: {description}", progressPercent);
-
-                    try
+                    var capturedPerson = person;
+                    var capturedLinks = linkItems;
+                    var capturedDesc = description;
+                    var capturedCount = linkItems.Count;
+                    assignTasks.Add(Task.Run(async () =>
                     {
-                        await ExecuteWithRetryAsync(action, description);
-                        result.AccessLevelsAssigned++;
-                        Log($"   -> SUCCESS: {description}");
-                    }
-                    catch (Exception ex)
-                    {
-                        var details = FormatExceptionDetails(ex);
-                        var warning = $"Failed to assign {description}";
-                        result.Warnings.Add($"{warning}: {ex.Message}");
-                        Log($"   -> FAILED: {warning}");
-                        Log($"   -> Details: {details}");
-                    }
-
-                    if (i < accessAssignmentTasks.Count - 1)
-                    {
-                        await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
-                    }
+                        try
+                        {
+                            await ExecuteWithRetryAsync(
+                                () => client.AddScheduledAccessLevelBatchForPersonAsync(capturedPerson, capturedLinks),
+                                capturedDesc);
+                            Interlocked.Add(ref assignedCount, capturedCount);
+                            Log($"   -> SUCCESS: {capturedDesc}");
+                        }
+                        catch (Exception ex)
+                        {
+                            var details = FormatExceptionDetails(ex);
+                            var warning = $"Failed to assign {capturedDesc}";
+                            lock (result.Warnings) { result.Warnings.Add($"{warning}: {ex.Message}"); }
+                            Log($"   -> FAILED: {warning}");
+                            Log($"   -> Details: {details}");
+                        }
+                        finally
+                        {
+                            var done = Interlocked.Increment(ref completedPersons);
+                            int progressPercent = 30 + (int)((done / (double)totalPersons) * 70);
+                            ReportProgress(progress, $"Assigning access levels... ({done}/{totalPersons} people)", progressPercent);
+                            assignSemaphore.Release();
+                        }
+                    }, cancellationToken));
                 }
+
+                await Task.WhenAll(assignTasks);
+                result.AccessLevelsAssigned = assignedCount;
 
                 ReportProgress(progress, "Import complete!", 100);
                 Log("Import complete.");
@@ -586,46 +696,6 @@ namespace FeenicsCsvImport.ClassLibrary
                 CurrentStep = step,
                 TotalSteps = 100
             });
-        }
-
-        private async Task AssignScheduledAccessAsync(Client client, PersonInfo person, AccessLevelInfo accessLevel, DateTime activeOn, DateTime? expiresOn)
-        {
-            // For the scheduled access level API, a valid date range is always required.
-            // If no expiry is provided, use a date 50 years from now to represent permanent access.
-            var effectiveExpiresOn = expiresOn ?? DateTime.UtcNow.AddYears(50);
-
-            Log($"DEBUG: AddScheduledAccessLevelBatchForPersonAsync call:");
-            Log($"DEBUG:   Person: '{person.CommonName}' (Key={person.Key})");
-            Log($"DEBUG:   AccessLevel: '{accessLevel.CommonName}' (Key={accessLevel.Key})");
-            Log($"DEBUG:   ActiveOn: {activeOn:O}");
-            Log($"DEBUG:   ExpiresOn: {effectiveExpiresOn:O}{(expiresOn.HasValue ? "" : " (no expiry provided, using 50 years from now)") }");
-
-            var metaDoc = new BsonDocument
-            {
-                { "ActiveOn", new BsonDateTime(activeOn) },
-                { "ExpiresOn", new BsonDateTime(effectiveExpiresOn) }
-            };
-
-            var linkItem = new ObjectLinkItem
-            {
-                LinkedObjectKey = accessLevel.Key,
-                Relation = "ScheduledAccessLevel",
-                MetaDataBson = metaDoc.ToBson()
-            };
-
-            Log($"DEBUG:   ObjectLinkItem: LinkedObjectKey={linkItem.LinkedObjectKey}, Relation={linkItem.Relation}, MetaDataBson.Length={linkItem.MetaDataBson?.Length}");
-
-            try
-            {
-                await client.AddScheduledAccessLevelBatchForPersonAsync(person, new[] { linkItem });
-                Log($"   -> Scheduled {accessLevel.CommonName}: {activeOn.ToShortDateString()} to {effectiveExpiresOn.ToShortDateString()}");
-            }
-            catch (FailedOutcomeException ex)
-            {
-                Log($"   -> API ERROR in AddScheduledAccessLevelBatchForPersonAsync:");
-                Log($"      {FormatExceptionDetails(ex)}");
-                throw;
-            }
         }
 
         private async Task ExecuteWithRetryAsync(Func<Task> action, string operationName)
@@ -721,7 +791,7 @@ namespace FeenicsCsvImport.ClassLibrary
             rawAddress = rawAddress.Trim();
 
             // Postal Code
-            var zipRegex = new Regex(@"(?:\d{5}(?:-\d{4})?)|(?:[A-Za-z]\d[A-Za-z][ -]?\d[A-ZaZ]\d)$");
+            var zipRegex = new Regex(@"(?:\d{5}(?:-\d{4})?)|(?:[A-Za-z]\d[A-ZaZ][ -]?\d[A-Za-z]\d)$");
             var zipMatch = zipRegex.Match(rawAddress);
 
             if (zipMatch.Success)
@@ -753,6 +823,106 @@ namespace FeenicsCsvImport.ClassLibrary
             }
 
             return addressInfo;
+        }
+
+        /// <summary>
+        /// Deletes all people from the connected Feenics instance.
+        /// This is a destructive operation and cannot be undone.
+        /// </summary>
+        public async Task<(int Deleted, int Failed, List<string> Errors)> DeleteAllPeopleAsync(
+            IProgress<ImportProgress> progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            int deleted = 0;
+            int failed = 0;
+            var errors = new List<string>();
+
+            var client = new Client(_config.ApiUrl);
+            Log($"Connecting to API for delete operation...");
+
+            var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
+            if (!success)
+            {
+                errors.Add($"Login failed: {msg}");
+                return (deleted, failed, errors);
+            }
+
+            var instance = await client.GetCurrentInstanceAsync();
+            Log($"Connected to: {instance.CommonName}");
+
+            // Collect all people
+            ReportProgress(progress, "Retrieving all people...", 5);
+            var allPeople = new List<PersonInfo>();
+            int page = 0;
+            const int pageSize = 1000;
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                if (peoplePage == null || !peoplePage.Any())
+                    break;
+
+                allPeople.AddRange(peoplePage);
+
+                if (peoplePage.Count() < pageSize)
+                    break;
+
+                page++;
+                await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+            }
+
+            Log($"Found {allPeople.Count} people to delete.");
+
+            if (allPeople.Count == 0)
+            {
+                ReportProgress(progress, "No people found.", 100);
+                return (deleted, failed, errors);
+            }
+
+            // Delete people in parallel with throttle
+            int completedDeletes = 0;
+            var deleteSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+            var deleteTasks = new List<Task>();
+            Log($"Deleting {allPeople.Count} people (concurrency={_config.MaxConcurrency})...");
+
+            foreach (var person in allPeople)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await deleteSemaphore.WaitAsync(cancellationToken);
+
+                var capturedPerson = person;
+                deleteTasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ExecuteWithRetryAsync(
+                            () => client.DeletePersonAsync(capturedPerson),
+                            $"Delete '{capturedPerson.CommonName}'");
+                        Interlocked.Increment(ref deleted);
+                        Log($"Deleted '{capturedPerson.CommonName}' (Key={capturedPerson.Key})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Interlocked.Increment(ref failed);
+                        var errMsg = $"Failed to delete '{capturedPerson.CommonName}': {ex.Message}";
+                        lock (errors) { errors.Add(errMsg); }
+                        Log($"ERROR: {errMsg}");
+                    }
+                    finally
+                    {
+                        var done = Interlocked.Increment(ref completedDeletes);
+                        int progressPercent = 10 + (int)((done / (double)allPeople.Count) * 90);
+                        ReportProgress(progress, $"Deleting {done}/{allPeople.Count}...", progressPercent);
+                        deleteSemaphore.Release();
+                    }
+                }, cancellationToken));
+            }
+
+            await Task.WhenAll(deleteTasks);
+
+            ReportProgress(progress, "Delete complete.", 100);
+            Log($"Delete complete. Deleted: {deleted}, Failed: {failed}");
+            return (deleted, failed, errors);
         }
     }
 }

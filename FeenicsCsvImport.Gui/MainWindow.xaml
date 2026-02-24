@@ -132,11 +132,14 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <ProgressBar Grid.Column="0" x:Name="progressBar" Height="20" Margin="0,0,10,0"/>
-            <TextBlock Grid.Column="1" x:Name="txtProgress" VerticalAlignment="Center" Width="200"/>
+            <TextBlock Grid.Column="1" x:Name="txtProgress" VerticalAlignment="Center" Width="300"/>
         </Grid>
 
         <!-- Action Buttons -->
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnDeleteAll" Content="Delete All People" Width="140" Height="35" 
+                    Click="BtnDeleteAll_Click" Margin="0,0,10,0"
+                    Background="#D32F2F" Foreground="White" FontWeight="Bold"/>
             <Button x:Name="btnImport" Content="Start Import" Width="120" Height="35" 
                     Click="BtnImport_Click" IsEnabled="False" Margin="0,0,10,0"
                     Background="#4CAF50" Foreground="White" FontWeight="Bold"/>

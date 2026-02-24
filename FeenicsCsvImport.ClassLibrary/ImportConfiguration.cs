@@ -60,6 +60,13 @@ namespace FeenicsCsvImport.ClassLibrary
         public int MaxRetryDelayMs { get; set; } = 30000;
 
         /// <summary>
+        /// Maximum number of concurrent API calls for parallelizable operations
+        /// such as person updates, access level assignments, and deletions.
+        /// Set to 1 to disable parallelism. Default is 5.
+        /// </summary>
+        public int MaxConcurrency { get; set; } = 5;
+
+        /// <summary>
         /// Creates a default configuration with the original hardcoded access level rules.
         /// </summary>
         public static ImportConfiguration CreateDefault()
