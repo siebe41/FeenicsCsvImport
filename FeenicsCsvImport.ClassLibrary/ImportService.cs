@@ -456,6 +456,7 @@ namespace FeenicsCsvImport.ClassLibrary
                                 var nameParts = capturedRecord.Name.Split(' ');
                                 capturedExisting.GivenName = nameParts[0];
                                 capturedExisting.Surname = nameParts.Length > 1 ? nameParts[1] : "";
+
                                 capturedExisting.Addresses = new AddressInfo[]
                                 {
                                     new PhoneInfo { Number = capturedRecord.Phone, Type = "Mobile" },
@@ -648,7 +649,7 @@ namespace FeenicsCsvImport.ClassLibrary
                         finally
                         {
                             var done = Interlocked.Increment(ref completedPersons);
-                            int progressPercent = 30 + (int)((done / (double)totalPersons) * 70);
+                            int progressPercent = 30 + (int)((done / (double)totalPersons) * 62);
                             ReportProgress(progress, $"Assigning access levels... ({done}/{totalPersons} people)", progressPercent);
                             assignSemaphore.Release();
                         }
@@ -657,6 +658,71 @@ namespace FeenicsCsvImport.ClassLibrary
 
                 await Task.WhenAll(assignTasks);
                 result.AccessLevelsAssigned = assignedCount;
+
+                // 8. Add birthday notes to each person's profile
+                var peopleForNotes = new List<(PersonInfo Person, DateTime Birthday, string Name)>();
+                foreach (var record in records)
+                {
+                    if (skippedNames.Contains(record.Name))
+                        continue;
+                    if (!matchedPeopleByName.TryGetValue(record.Name, out var person))
+                        continue;
+                    if (record.Birthday == default(DateTime))
+                        continue;
+                    peopleForNotes.Add((person, record.Birthday, record.Name));
+                }
+
+                if (peopleForNotes.Count > 0)
+                {
+                    int totalNotes = peopleForNotes.Count;
+                    int completedNotes = 0;
+                    int notesAdded = 0;
+                    var noteSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+                    var noteTasks = new List<Task>();
+                    Log($"Adding birthday notes for {totalNotes} people (concurrency={_config.MaxConcurrency})...");
+                    ReportProgress(progress, $"Adding birthday notes... (0/{totalNotes})", 92);
+
+                    foreach (var (person, birthday, name) in peopleForNotes)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        await noteSemaphore.WaitAsync(cancellationToken);
+
+                        var capturedPerson = person;
+                        var capturedBirthday = birthday;
+                        var capturedName = name;
+                        noteTasks.Add(Task.Run(async () =>
+                        {
+                            try
+                            {
+                                var note = new NoteInfo
+                                {
+                                    NoteText = $"Birthday: {capturedBirthday:MMMM d, yyyy}"
+                                };
+                                await ExecuteWithRetryAsync(
+                                    () => client.AddNoteAsync(capturedPerson, note),
+                                    $"Add birthday note for '{capturedName}'");
+                                Interlocked.Increment(ref notesAdded);
+                                Log($"Added birthday note for '{capturedName}': {note.NoteText}");
+                            }
+                            catch (Exception ex)
+                            {
+                                var warning = $"Failed to add birthday note for '{capturedName}': {ex.Message}";
+                                lock (result.Warnings) { result.Warnings.Add(warning); }
+                                Log($"Warning: {warning}");
+                            }
+                            finally
+                            {
+                                var done = Interlocked.Increment(ref completedNotes);
+                                int progressPercent = 92 + (int)((done / (double)totalNotes) * 8);
+                                ReportProgress(progress, $"Adding birthday notes... ({done}/{totalNotes})", progressPercent);
+                                noteSemaphore.Release();
+                            }
+                        }, cancellationToken));
+                    }
+
+                    await Task.WhenAll(noteTasks);
+                    Log($"Birthday notes complete. Added: {notesAdded}/{totalNotes}");
+                }
 
                 ReportProgress(progress, "Import complete!", 100);
                 Log("Import complete.");
