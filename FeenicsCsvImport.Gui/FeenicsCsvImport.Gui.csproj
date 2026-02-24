@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -157,6 +157,11 @@
     <PackageReference Include="Flurl.Http">
       <Version>2.4.2</Version>
     </PackageReference>
+    <PackageReference Include="GitVersion.MsBuild">
+      <Version>6.6.0</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="MQTTnet.Extensions.ManagedClient">
       <Version>4.3.7.1207</Version>
     </PackageReference>
@@ -181,4 +186,50 @@
     </BootstrapperPackage>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+	<!-- GitVersion: stamp assemblies and capture version for zip naming -->
+	
+    <!-- Get SemVer from GitVersion for zip naming -->
+  <Target Name="GetGitVersion" BeforeTargets="PackageZip">
+    <Exec Command="dotnet-gitversion /showvariable SemVer" ConsoleToMsBuild="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitVersion_SemVer" />
+    </Exec>
+    <PropertyGroup>
+      <GitVersion_SemVer Condition="'$(GitVersion_SemVer)' == ''">0.0.0</GitVersion_SemVer>
+    </PropertyGroup>
+    <Message Importance="high" Text="GitVersion SemVer: $(GitVersion_SemVer)" />
+  </Target>
+
+  <!-- Package zip in Release builds -->
+  <Target Name="PackageZip" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <ZipStagingDir>$(OutputPath)ZipStaging\</ZipStagingDir>
+      <ZipVersionSuffix Condition="'$(GitVersion_SemVer)' != ''">-$(GitVersion_SemVer)</ZipVersionSuffix>
+      <ZipVersionSuffix Condition="'$(GitVersion_SemVer)' == ''">-0.0.0</ZipVersionSuffix>
+      <ZipOutputFile>$(OutputPath)FeenicsCsvImport$(ZipVersionSuffix).zip</ZipOutputFile>
+    </PropertyGroup>
+
+    <!-- Clean previous staging -->
+    <RemoveDir Directories="$(ZipStagingDir)" />
+    <MakeDir Directories="$(ZipStagingDir)" />
+
+    <!-- Collect runtime files -->
+    <ItemGroup>
+      <_ZipDlls Include="$(OutputPath)*.dll" />
+      <_ZipConfig Include="$(OutputPath)$(AssemblyName).exe.config" />
+    </ItemGroup>
+
+    <!-- Copy dlls and config -->
+    <Copy SourceFiles="@(_ZipDlls)" DestinationFolder="$(ZipStagingDir)" />
+    <Copy SourceFiles="@(_ZipConfig)" DestinationFolder="$(ZipStagingDir)" Condition="Exists('$(OutputPath)$(AssemblyName).exe.config')" />
+
+    <!-- Copy exe renamed to Start.exe -->
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).exe" DestinationFiles="$(ZipStagingDir)Start.exe" />
+
+    <!-- Create zip -->
+    <Delete Files="$(ZipOutputFile)" Condition="Exists('$(ZipOutputFile)')" />
+    <ZipDirectory SourceDirectory="$(ZipStagingDir)" DestinationFile="$(ZipOutputFile)" />
+
+    <!-- Clean up staging -->
+    <RemoveDir Directories="$(ZipStagingDir)" />
+  </Target>
 </Project>

@@ -62,8 +62,17 @@
     <PackageReference Include="Feenics.Keep.WebApi.Wrapper.Standard">
       <Version>25.12.1839</Version>
     </PackageReference>
-    <PackageReference Include="Flurl"><Version>2.8.2</Version></PackageReference>
-    <PackageReference Include="Flurl.Http"><Version>2.4.2</Version></PackageReference>
+    <PackageReference Include="Flurl">
+      <Version>2.8.2</Version>
+    </PackageReference>
+    <PackageReference Include="Flurl.Http">
+      <Version>2.4.2</Version>
+    </PackageReference>
+    <PackageReference Include="GitVersion.MsBuild">
+      <Version>6.6.0</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
     <PackageReference Include="MQTTnet.Extensions.ManagedClient">
       <Version>4.3.7.1207</Version>
     </PackageReference>
