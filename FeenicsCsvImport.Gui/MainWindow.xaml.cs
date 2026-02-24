@@ -183,6 +183,8 @@ namespace FeenicsCsvImport.Gui
                 txtCsvFile.Text = _selectedFilePath;
                 btnPreview.IsEnabled = true;
                 btnImport.IsEnabled = true;
+                btnDisableCards.IsEnabled = true;
+                btnDeleteCsv.IsEnabled = true;
                 LogMessage($"Selected file: {_selectedFilePath}");
             }
         }
@@ -447,6 +449,193 @@ namespace FeenicsCsvImport.Gui
             }
         }
 
+        private async void BtnDeleteCsv_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_selectedFilePath))
+            {
+                MessageBox.Show("Please select a CSV file first.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtApiUrl.Text) ||
+                string.IsNullOrWhiteSpace(txtInstance.Text) ||
+                string.IsNullOrWhiteSpace(txtUsername.Text) ||
+                string.IsNullOrWhiteSpace(txtPassword.Password))
+            {
+                MessageBox.Show("Please enter API URL, Instance, Username, and Password.", "Missing Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                "This will permanently delete all people from the Feenics instance whose names match entries in the selected CSV file.\n\n" +
+                "This action cannot be undone.\n\nAre you sure you want to continue?",
+                "Delete CSV People", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            SetUIEnabled(false);
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            try
+            {
+                var config = CreateConfiguration();
+                var service = new ImportService(config, LogMessage);
+
+                var progress = new Progress<ImportProgress>(p =>
+                {
+                    progressBar.Value = p.CurrentStep;
+                    txtProgress.Text = p.Message;
+                });
+
+                LogMessage("Starting delete CSV people...");
+                var (deleted, skipped, failed, errors) = await service.DeleteCsvPeopleAsync(
+                    _selectedFilePath, progress, _cancellationTokenSource.Token);
+
+                LogMessage("");
+                LogMessage("=== Delete CSV People Summary ===");
+                LogMessage($"Deleted: {deleted}");
+                LogMessage($"Not found: {skipped}");
+                LogMessage($"Failed: {failed}");
+
+                if (errors.Count > 0)
+                {
+                    LogMessage("");
+                    LogMessage("Errors:");
+                    foreach (var error in errors)
+                        LogMessage($"  - {error}");
+                }
+
+                if (failed == 0)
+                {
+                    MessageBox.Show(
+                        $"Delete CSV people complete.\n\nDeleted: {deleted}\nNot found in instance: {skipped}",
+                        "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"Delete completed with errors.\n\nDeleted: {deleted}\nNot found: {skipped}\nFailed: {failed}\n\nCheck the log for details.",
+                        "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                LogMessage("Delete CSV people was cancelled by user.");
+                MessageBox.Show("Delete was cancelled.", "Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                var details = ImportService.FormatExceptionDetails(ex);
+                LogMessage($"Delete CSV people failed: {ex.Message}");
+                LogMessage($"  {details}");
+                MessageBox.Show($"Delete failed: {ex.Message}\n\nCheck the log for full details.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetUIEnabled(true);
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
+            }
+        }
+
+        private async void BtnDisableCards_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_selectedFilePath))
+            {
+                MessageBox.Show("Please select a CSV file first.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(txtApiUrl.Text) ||
+                string.IsNullOrWhiteSpace(txtInstance.Text) ||
+                string.IsNullOrWhiteSpace(txtUsername.Text) ||
+                string.IsNullOrWhiteSpace(txtPassword.Password))
+            {
+                MessageBox.Show("Please enter API URL, Instance, Username, and Password.", "Missing Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirm = MessageBox.Show(
+                "This will disable ALL active cards for any person in the Feenics instance whose street address matches an address in the CSV file.\n\n" +
+                "Matching is fuzzy — it uses only the street number and name, ignoring city/state/zip and accounting for abbreviations (St vs Street, Ave vs Avenue, etc.).\n\n" +
+                "Are you sure you want to continue?",
+                "Disable Cards by Address", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            SetUIEnabled(false);
+            _cancellationTokenSource = new CancellationTokenSource();
+
+            try
+            {
+                var config = CreateConfiguration();
+                var service = new ImportService(config, LogMessage);
+
+                var progress = new Progress<ImportProgress>(p =>
+                {
+                    progressBar.Value = p.CurrentStep;
+                    txtProgress.Text = p.Message;
+                });
+
+                LogMessage("Starting disable cards by address...");
+                var result = await service.DisableCardsByAddressAsync(_selectedFilePath, progress, _cancellationTokenSource.Token);
+
+                LogMessage("");
+                LogMessage("=== Disable Cards Summary ===");
+                LogMessage($"People Matched: {result.PeopleMatched}");
+                LogMessage($"Cards Disabled: {result.CardsDisabled}");
+                LogMessage($"Already Disabled: {result.CardsAlreadyDisabled}");
+                LogMessage($"Failed: {result.Failed}");
+
+                if (result.Errors.Count > 0)
+                {
+                    LogMessage("");
+                    LogMessage("Errors:");
+                    foreach (var error in result.Errors)
+                        LogMessage($"  - {error}");
+                }
+
+                if (result.Warnings.Count > 0)
+                {
+                    LogMessage("");
+                    LogMessage("Warnings:");
+                    foreach (var warning in result.Warnings)
+                        LogMessage($"  - {warning}");
+                }
+
+                if (result.Failed == 0)
+                {
+                    MessageBox.Show(
+                        $"Disable cards complete.\n\nPeople matched: {result.PeopleMatched}\nCards disabled: {result.CardsDisabled}\nAlready disabled: {result.CardsAlreadyDisabled}",
+                        "Disable Cards Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"Disable cards completed with errors.\n\nCards disabled: {result.CardsDisabled}\nFailed: {result.Failed}\n\nCheck the log for details.",
+                        "Disable Cards Complete", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                LogMessage("Disable cards was cancelled by user.");
+                MessageBox.Show("Disable cards was cancelled.", "Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                var details = ImportService.FormatExceptionDetails(ex);
+                LogMessage($"Disable cards failed: {ex.Message}");
+                LogMessage($"  {details}");
+                MessageBox.Show($"Disable cards failed: {ex.Message}\n\nCheck the log for full details.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetUIEnabled(true);
+                _cancellationTokenSource?.Dispose();
+                _cancellationTokenSource = null;
+            }
+        }
+
         private ImportConfiguration CreateConfiguration()
         {
             var config = new ImportConfiguration
@@ -485,6 +674,8 @@ namespace FeenicsCsvImport.Gui
             btnBrowse.IsEnabled = enabled;
             btnPreview.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
             btnImport.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
+            btnDisableCards.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
+            btnDeleteCsv.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
             btnDeleteAll.IsEnabled = enabled;
             btnCancel.IsEnabled = !enabled;
             txtApiUrl.IsEnabled = enabled;

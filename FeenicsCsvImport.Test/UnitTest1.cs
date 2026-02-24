@@ -710,4 +710,207 @@ namespace FeenicsCsvImport.Test
     }
 
     #endregion
+
+    #region AddressNormalizer Tests
+
+    [TestClass]
+    public class AddressNormalizerTests
+    {
+        [TestMethod]
+        public void NormalizeStreet_StripsCityStateZip()
+        {
+            var result = AddressNormalizer.NormalizeStreet("123 Main Street, Springfield, IL 62701");
+            Assert.AreEqual("123 main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsStAbbreviation()
+        {
+            var result = AddressNormalizer.NormalizeStreet("123 Main St, Springfield, IL 62701");
+            Assert.AreEqual("123 main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsAveAbbreviation()
+        {
+            var result = AddressNormalizer.NormalizeStreet("456 Oak Ave, Columbus, OH 43215");
+            Assert.AreEqual("456 oak avenue", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsBlvd()
+        {
+            var result = AddressNormalizer.NormalizeStreet("789 Sunset Blvd, Los Angeles, CA 90028");
+            Assert.AreEqual("789 sunset boulevard", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsDr()
+        {
+            var result = AddressNormalizer.NormalizeStreet("100 Park Dr, Dallas, TX 75001");
+            Assert.AreEqual("100 park drive", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsRd()
+        {
+            var result = AddressNormalizer.NormalizeStreet("55 Elm Rd, Boston, MA 02101");
+            Assert.AreEqual("55 elm road", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsLn()
+        {
+            var result = AddressNormalizer.NormalizeStreet("22 Willow Ln, Portland, OR 97201");
+            Assert.AreEqual("22 willow lane", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsCt()
+        {
+            var result = AddressNormalizer.NormalizeStreet("8 Pine Ct, Miami, FL 33101");
+            Assert.AreEqual("8 pine court", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ExpandsDirectionals()
+        {
+            var result = AddressNormalizer.NormalizeStreet("500 N Main St, Chicago, IL 60601");
+            Assert.AreEqual("500 north main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_RemovesPeriods()
+        {
+            var result = AddressNormalizer.NormalizeStreet("123 Main St., Springfield, IL 62701");
+            Assert.AreEqual("123 main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_CollapsesExtraSpaces()
+        {
+            var result = AddressNormalizer.NormalizeStreet("123  Main   St, Springfield, IL 62701");
+            Assert.AreEqual("123 main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_NullReturnsEmpty()
+        {
+            Assert.AreEqual("", AddressNormalizer.NormalizeStreet(null));
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_EmptyReturnsEmpty()
+        {
+            Assert.AreEqual("", AddressNormalizer.NormalizeStreet(""));
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_WhitespaceReturnsEmpty()
+        {
+            Assert.AreEqual("", AddressNormalizer.NormalizeStreet("   "));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_SameAddressDifferentAbbreviations_ReturnsTrue()
+        {
+            Assert.IsTrue(AddressNormalizer.StreetsMatch(
+                "123 Main St, Springfield, IL 62701",
+                "123 Main Street, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_SameStreetDifferentCity_ReturnsTrue()
+        {
+            Assert.IsTrue(AddressNormalizer.StreetsMatch(
+                "123 Main St, Springfield, IL 62701",
+                "123 Main Street, Chicago, IL 60601"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_DifferentStreetNumber_ReturnsFalse()
+        {
+            Assert.IsFalse(AddressNormalizer.StreetsMatch(
+                "123 Main St, Springfield, IL 62701",
+                "456 Main St, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_DifferentStreetName_ReturnsFalse()
+        {
+            Assert.IsFalse(AddressNormalizer.StreetsMatch(
+                "123 Main St, Springfield, IL 62701",
+                "123 Oak Ave, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_WithPeriodVsWithout_ReturnsTrue()
+        {
+            Assert.IsTrue(AddressNormalizer.StreetsMatch(
+                "123 Main St., Springfield, IL 62701",
+                "123 Main St, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_CaseInsensitive_ReturnsTrue()
+        {
+            Assert.IsTrue(AddressNormalizer.StreetsMatch(
+                "123 MAIN STREET, Springfield, IL 62701",
+                "123 main street, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void NormalizeStreetValue_WorksOnPreParsedStreet()
+        {
+            // Simulates what comes from MailingAddressInfo.Street
+            Assert.AreEqual("123 main street", AddressNormalizer.NormalizeStreetValue("123 Main St"));
+            Assert.AreEqual("456 oak avenue", AddressNormalizer.NormalizeStreetValue("456 Oak Ave"));
+            Assert.AreEqual("789 north elm road", AddressNormalizer.NormalizeStreetValue("789 N Elm Rd"));
+        }
+
+        [TestMethod]
+        public void NormalizedStreetMatchesPersonStreet_AbbreviationDifference_ReturnsTrue()
+        {
+            var csvNorm = AddressNormalizer.NormalizeStreet("123 Main St, Springfield, IL 62701");
+            Assert.IsTrue(AddressNormalizer.NormalizedStreetMatchesPersonStreet(csvNorm, "123 Main Street"));
+        }
+
+        [TestMethod]
+        public void NormalizedStreetMatchesPersonStreet_DifferentAddress_ReturnsFalse()
+        {
+            var csvNorm = AddressNormalizer.NormalizeStreet("123 Main St, Springfield, IL 62701");
+            Assert.IsFalse(AddressNormalizer.NormalizedStreetMatchesPersonStreet(csvNorm, "456 Oak Avenue"));
+        }
+
+        [TestMethod]
+        public void StreetsMatch_ApartmentAbbreviation_ReturnsTrue()
+        {
+            Assert.IsTrue(AddressNormalizer.StreetsMatch(
+                "123 Main St Apt 4B, Springfield, IL 62701",
+                "123 Main Street Apartment 4B, Springfield, IL 62701"));
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_ZipPlus4_StillStrips()
+        {
+            var result = AddressNormalizer.NormalizeStreet("123 Main St, Chicago, IL 60601-1234");
+            Assert.AreEqual("123 main street", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_PkwyExpands()
+        {
+            var result = AddressNormalizer.NormalizeStreet("100 River Pkwy, Austin, TX 78701");
+            Assert.AreEqual("100 river parkway", result);
+        }
+
+        [TestMethod]
+        public void NormalizeStreet_MultipleDirectionals()
+        {
+            var result = AddressNormalizer.NormalizeStreet("200 NW 5th Ave, Portland, OR 97209");
+            Assert.AreEqual("200 northwest 5th avenue", result);
+        }
+    }
+
+    #endregion
 }

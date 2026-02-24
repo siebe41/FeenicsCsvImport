@@ -42,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AccessLevelRule.cs" />
+    <Compile Include="AddressNormalizer.cs" />
     <Compile Include="DuplicateHandling.cs" />
     <Compile Include="SavedSettings.cs" />
     <Compile Include="Class1.cs" />

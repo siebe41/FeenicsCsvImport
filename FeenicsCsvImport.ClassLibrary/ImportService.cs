@@ -924,5 +924,373 @@ namespace FeenicsCsvImport.ClassLibrary
             Log($"Delete complete. Deleted: {deleted}, Failed: {failed}");
             return (deleted, failed, errors);
         }
+
+        /// <summary>
+        /// Result of a disable-cards operation.
+        /// </summary>
+        public class DisableCardsResult
+        {
+            public bool Success { get; set; }
+            public int PeopleMatched { get; set; }
+            public int CardsDisabled { get; set; }
+            public int CardsAlreadyDisabled { get; set; }
+            public int Failed { get; set; }
+            public List<string> Errors { get; set; } = new List<string>();
+            public List<string> Warnings { get; set; } = new List<string>();
+        }
+
+        /// <summary>
+        /// Disables all active cards for any person in the instance whose street address
+        /// fuzzy-matches an address in the provided CSV file.
+        /// Matching uses only the street number/name portion, ignoring city, state, zip,
+        /// and normalizing common abbreviations (St vs Street, Ave vs Avenue, etc.).
+        /// </summary>
+        public async Task<DisableCardsResult> DisableCardsByAddressAsync(
+            string csvFilePath,
+            IProgress<ImportProgress> progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            var result = new DisableCardsResult();
+
+            try
+            {
+                // 1. Read and validate CSV
+                ReportProgress(progress, "Reading CSV file...", 0);
+                Log("Reading CSV for disable-cards operation...");
+                var allRecords = ReadCsvFile(csvFilePath);
+
+                var csvNormalizedStreets = new HashSet<string>();
+                foreach (var r in allRecords)
+                {
+                    if (string.IsNullOrWhiteSpace(r.Address))
+                        continue;
+                    var normalized = AddressNormalizer.NormalizeStreet(r.Address);
+                    if (!string.IsNullOrEmpty(normalized))
+                    {
+                        csvNormalizedStreets.Add(normalized);
+                        Log($"DEBUG: CSV street normalized: '{r.Address}' -> '{normalized}'");
+                    }
+                }
+
+                if (csvNormalizedStreets.Count == 0)
+                {
+                    result.Errors.Add("No valid addresses found in CSV.");
+                    return result;
+                }
+
+                Log($"Loaded {csvNormalizedStreets.Count} unique normalized street addresses from CSV.");
+
+                // 2. Authenticate
+                ReportProgress(progress, "Connecting to API...", 5);
+                Log("Connecting to API...");
+                var client = new Client(_config.ApiUrl);
+                var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
+                if (!success)
+                {
+                    result.Errors.Add($"Login failed: {msg}");
+                    return result;
+                }
+
+                var instance = await client.GetCurrentInstanceAsync();
+                Log($"Connected to: {instance.CommonName}");
+
+                // 3. Paginate all people and find address matches
+                ReportProgress(progress, "Retrieving all people...", 10);
+                var matchedPeople = new List<PersonInfo>();
+                int page = 0;
+                const int pageSize = 1000;
+                int totalScanned = 0;
+
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                    if (peoplePage == null || !peoplePage.Any())
+                        break;
+
+                    foreach (var person in peoplePage)
+                    {
+                        totalScanned++;
+                        if (person.Addresses == null)
+                            continue;
+
+                        foreach (var addr in person.Addresses)
+                        {
+                            if (addr is MailingAddressInfo mailing && !string.IsNullOrWhiteSpace(mailing.Street))
+                            {
+                                var personStreetNorm = AddressNormalizer.NormalizeStreetValue(mailing.Street);
+                                if (csvNormalizedStreets.Contains(personStreetNorm))
+                                {
+                                    matchedPeople.Add(person);
+                                    Log($"Address match: '{person.CommonName}' street='{mailing.Street}' -> normalized='{personStreetNorm}'");
+                                    break; // one match per person is enough
+                                }
+                            }
+                        }
+                    }
+
+                    if (peoplePage.Count() < pageSize)
+                        break;
+
+                    page++;
+                    await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+                }
+
+                result.PeopleMatched = matchedPeople.Count;
+                Log($"Scanned {totalScanned} people. {matchedPeople.Count} matched on street address.");
+
+                if (matchedPeople.Count == 0)
+                {
+                    ReportProgress(progress, "No matching people found.", 100);
+                    result.Success = true;
+                    return result;
+                }
+
+                // 4. For each matched person, fetch their cards and disable active ones
+                int completedPeople = 0;
+                int cardsDisabled = 0;
+                int cardsAlreadyDisabled = 0;
+                int failedCards = 0;
+                var disableSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+                var disableTasks = new List<Task>();
+
+                Log($"Disabling cards for {matchedPeople.Count} people (concurrency={_config.MaxConcurrency})...");
+
+                foreach (var person in matchedPeople)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await disableSemaphore.WaitAsync(cancellationToken);
+
+                    var capturedPerson = person;
+                    disableTasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var cards = await client.GetCardAssignmentsForPersonAsync(capturedPerson);
+                            if (cards == null || !cards.Any())
+                            {
+                                Log($"No cards found for '{capturedPerson.CommonName}'.");
+                                return;
+                            }
+
+                            foreach (var card in cards)
+                            {
+                                if (card.IsDisabled)
+                                {
+                                    Interlocked.Increment(ref cardsAlreadyDisabled);
+                                    Log($"Card '{card.DisplayCardNumber}' for '{capturedPerson.CommonName}' already disabled.");
+                                    continue;
+                                }
+
+                                try
+                                {
+                                    card.IsDisabled = true;
+                                    await ExecuteWithRetryAsync(
+                                        () => client.UpdateCardAssignmentAsync(card, null),
+                                        $"Disable card '{card.DisplayCardNumber}' for '{capturedPerson.CommonName}'");
+                                    Interlocked.Increment(ref cardsDisabled);
+                                    Log($"Disabled card '{card.DisplayCardNumber}' for '{capturedPerson.CommonName}'");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Interlocked.Increment(ref failedCards);
+                                    var errMsg = $"Failed to disable card '{card.DisplayCardNumber}' for '{capturedPerson.CommonName}': {ex.Message}";
+                                    lock (result.Warnings) { result.Warnings.Add(errMsg); }
+                                    Log($"ERROR: {errMsg}");
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Interlocked.Increment(ref failedCards);
+                            var errMsg = $"Failed to fetch cards for '{capturedPerson.CommonName}': {ex.Message}";
+                            lock (result.Warnings) { result.Warnings.Add(errMsg); }
+                            Log($"ERROR: {errMsg}");
+                        }
+                        finally
+                        {
+                            var done = Interlocked.Increment(ref completedPeople);
+                            int progressPercent = 20 + (int)((done / (double)matchedPeople.Count) * 80);
+                            ReportProgress(progress, $"Disabling cards... ({done}/{matchedPeople.Count} people)", progressPercent);
+                            disableSemaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+
+                await Task.WhenAll(disableTasks);
+
+                result.CardsDisabled = cardsDisabled;
+                result.CardsAlreadyDisabled = cardsAlreadyDisabled;
+                result.Failed = failedCards;
+                result.Success = failedCards == 0;
+
+                ReportProgress(progress, "Disable cards complete.", 100);
+                Log($"Disable cards complete. Matched: {matchedPeople.Count}, Disabled: {cardsDisabled}, Already disabled: {cardsAlreadyDisabled}, Failed: {failedCards}");
+            }
+            catch (OperationCanceledException)
+            {
+                result.Errors.Add("Operation was cancelled.");
+                Log("Disable cards was cancelled.");
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"Operation failed: {ex.Message}");
+                Log($"Disable cards failed: {FormatExceptionDetails(ex)}");
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Deletes people from the Feenics instance whose names match entries in the CSV file.
+        /// Matching is by CommonName (exact, case-sensitive).
+        /// </summary>
+        public async Task<(int Deleted, int Skipped, int Failed, List<string> Errors)> DeleteCsvPeopleAsync(
+            string csvFilePath,
+            IProgress<ImportProgress> progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            int deleted = 0;
+            int skipped = 0;
+            int failed = 0;
+            var errors = new List<string>();
+
+            try
+            {
+                // 1. Read CSV and collect names
+                ReportProgress(progress, "Reading CSV file...", 0);
+                Log("Reading CSV for delete-by-name operation...");
+                var allRecords = ReadCsvFile(csvFilePath);
+
+                var csvNames = new HashSet<string>();
+                foreach (var r in allRecords)
+                {
+                    if (!string.IsNullOrWhiteSpace(r.Name))
+                        csvNames.Add(r.Name);
+                }
+
+                if (csvNames.Count == 0)
+                {
+                    errors.Add("No valid names found in CSV.");
+                    return (deleted, skipped, failed, errors);
+                }
+
+                Log($"Loaded {csvNames.Count} unique names from CSV.");
+
+                // 2. Authenticate
+                ReportProgress(progress, "Connecting to API...", 5);
+                Log("Connecting to API...");
+                var client = new Client(_config.ApiUrl);
+                var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
+                if (!success)
+                {
+                    errors.Add($"Login failed: {msg}");
+                    return (deleted, skipped, failed, errors);
+                }
+
+                var instance = await client.GetCurrentInstanceAsync();
+                Log($"Connected to: {instance.CommonName}");
+
+                // 3. Paginate all people and find name matches
+                ReportProgress(progress, "Retrieving all people...", 10);
+                var matchedPeople = new List<PersonInfo>();
+                var remainingNames = new HashSet<string>(csvNames);
+                int page = 0;
+                const int pageSize = 1000;
+
+                while (true)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                    if (peoplePage == null || !peoplePage.Any())
+                        break;
+
+                    foreach (var person in peoplePage)
+                    {
+                        if (remainingNames.Contains(person.CommonName))
+                        {
+                            matchedPeople.Add(person);
+                            remainingNames.Remove(person.CommonName);
+                        }
+                    }
+
+                    if (peoplePage.Count() < pageSize)
+                        break;
+
+                    page++;
+                    await Task.Delay(_config.ApiCallDelayMs, cancellationToken);
+                }
+
+                Log($"Matched {matchedPeople.Count} people by name.");
+
+                foreach (var name in remainingNames)
+                {
+                    skipped++;
+                    Log($"Not found in instance: '{name}'");
+                }
+
+                if (matchedPeople.Count == 0)
+                {
+                    ReportProgress(progress, "No matching people found.", 100);
+                    return (deleted, skipped, failed, errors);
+                }
+
+                // 4. Delete matched people in parallel
+                int completedDeletes = 0;
+                var deleteSemaphore = new SemaphoreSlim(_config.MaxConcurrency);
+                var deleteTasks = new List<Task>();
+                Log($"Deleting {matchedPeople.Count} people (concurrency={_config.MaxConcurrency})...");
+
+                foreach (var person in matchedPeople)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await deleteSemaphore.WaitAsync(cancellationToken);
+
+                    var capturedPerson = person;
+                    deleteTasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await ExecuteWithRetryAsync(
+                                () => client.DeletePersonAsync(capturedPerson),
+                                $"Delete '{capturedPerson.CommonName}'");
+                            Interlocked.Increment(ref deleted);
+                            Log($"Deleted '{capturedPerson.CommonName}' (Key={capturedPerson.Key})");
+                        }
+                        catch (Exception ex)
+                        {
+                            Interlocked.Increment(ref failed);
+                            var errMsg = $"Failed to delete '{capturedPerson.CommonName}': {ex.Message}";
+                            lock (errors) { errors.Add(errMsg); }
+                            Log($"ERROR: {errMsg}");
+                        }
+                        finally
+                        {
+                            var done = Interlocked.Increment(ref completedDeletes);
+                            int progressPercent = 15 + (int)((done / (double)matchedPeople.Count) * 85);
+                            ReportProgress(progress, $"Deleting {done}/{matchedPeople.Count}...", progressPercent);
+                            deleteSemaphore.Release();
+                        }
+                    }, cancellationToken));
+                }
+
+                await Task.WhenAll(deleteTasks);
+
+                ReportProgress(progress, "Delete complete.", 100);
+                Log($"Delete CSV people complete. Deleted: {deleted}, Not found: {skipped}, Failed: {failed}");
+            }
+            catch (OperationCanceledException)
+            {
+                errors.Add("Operation was cancelled.");
+                Log("Delete CSV people was cancelled.");
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Operation failed: {ex.Message}");
+                Log($"Delete CSV people failed: {FormatExceptionDetails(ex)}");
+            }
+
+            return (deleted, skipped, failed, errors);
+        }
     }
 }
