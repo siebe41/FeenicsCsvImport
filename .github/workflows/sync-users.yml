@@ -24,7 +24,7 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
- # 1. Setup the classic NuGet package manager
+# 1. Setup the classic NuGet package manager
       - name: Setup NuGet
         uses: NuGet/setup-nuget@v2
         
@@ -32,22 +32,13 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 3. Add your Custom NuGet Feed
-      - name: Add Custom NuGet Feed
-        # Replace 'FeedName' and the URL with your actual feed details
-        run: nuget sources add -Name "feenics" -Source "https://nuget-secure.feenics.com/nuget"
-
-- name: Patch NuGet Config for HTTP Bypass
+      # 3. Generate a local NuGet.Config file that bypasses the HTTP block
+      - name: Create Local NuGet Config
+        shell: powershell
         run: |
-          $configPath = "$env:APPDATA\NuGet\NuGet.Config"
-          [xml]$config = Get-Content $configPath
+          $xml = '<?xml version="1.0" encoding="utf-8"?><configuration><packageSources><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /><add key="feenics" value="https://nuget-secure.feenics.com/nuget" allowInsecureConnections="true" /></packageSources></configuration>'
+          Set-Content -Path NuGet.Config -Value $xml
           
-          # Find the 'feenics' source you just added and append the bypass flag
-          $node = $config.configuration.packageSources.add | Where-Object { $_.key -eq 'feenics' }
-          if ($node) {
-              $node.SetAttribute('allowInsecureConnections', 'true')
-              $config.Save($configPath)
-          }
       # 4. Download your NuGet packages
       - name: Restore NuGet Packages
         run: nuget restore FeenicsCsvImport.sln
