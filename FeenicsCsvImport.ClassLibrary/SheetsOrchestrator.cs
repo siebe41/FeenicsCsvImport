@@ -40,24 +40,63 @@ namespace FeenicsCsvImport.ClassLibrary
 
 		public async Task ExecuteAutomationAsync()
 		{
-			TriggerMacroAsync().Wait(); // Ensure the macro runs before we read the data
-										// 1. Read data from Google Sheets
-			IList<IList<object>> sheetData = await ReadSheetDataAsync();
-
-			if (sheetData != null && sheetData.Count > 0)
+			// Step 1: Trigger macro to refresh sheet data
+			try
 			{
-				Console.WriteLine($"Core: Successfully retrieved {sheetData.Count} rows from Sheets.");
+				Console.WriteLine("Step 1: Triggering macro to refresh sheet data...");
+				await TriggerMacroAsync();
+				Console.WriteLine("Step 1: Macro triggered successfully.");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Step 1 FAILED: Trigger macro: {ex.GetType().FullName}: {ex.Message}");
+				Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+				throw;
+			}
 
-				// Define a temporary file name
-				string tempCsvPath = "temp_users.csv";
+			// Step 2: Read data from Google Sheets
+			IList<IList<object>> sheetData;
+			try
+			{
+				Console.WriteLine("Step 2: Reading data from Google Sheets...");
+				sheetData = await ReadSheetDataAsync();
+				Console.WriteLine($"Step 2: Read {sheetData?.Count ?? 0} rows from Sheets.");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Step 2 FAILED: Read sheet data: {ex.GetType().FullName}: {ex.Message}");
+				Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+				throw;
+			}
 
+			if (sheetData == null || sheetData.Count == 0)
+			{
+				Console.WriteLine("No data found in sheet. Nothing to import.");
+				return;
+			}
+
+			string tempCsvPath = "temp_users.csv";
+
+			try
+			{
+				// Step 3: Save data to CSV
 				try
 				{
-					// 2. Save data to a temporary CSV file
+					Console.WriteLine("Step 3: Saving sheet data to temporary CSV...");
 					SaveDataToCsv(sheetData, tempCsvPath);
-					Console.WriteLine("Core: Temporary CSV file created.");
+					Console.WriteLine($"Step 3: CSV created at '{tempCsvPath}'.");
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Step 3 FAILED: Save CSV: {ex.GetType().FullName}: {ex.Message}");
+					Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+					throw;
+				}
 
-					// 3. Configure Acre Security Import
+				// Step 4: Configure and run Acre Security Import
+				try
+				{
+					Console.WriteLine("Step 4: Configuring Acre Security import...");
 					var config = new ImportConfiguration
 					{
 						ApiUrl = "https://api.us.acresecurity.cloud",
@@ -71,11 +110,10 @@ namespace FeenicsCsvImport.ClassLibrary
 						MaxRetryDelayMs = 30000
 					};
 
-					// 4. Execute the import
 					var service = new ImportService(config, Console.WriteLine);
-					Console.WriteLine("Core: Executing Acre Security Import...");
+					Console.WriteLine("Step 4: Executing import...");
 					var result = await service.ExecuteImportAsync(tempCsvPath);
-					Console.WriteLine("Core: Import execution finished.");
+					Console.WriteLine("Step 4: Import execution finished.");
 
 					// Report final results
 					Console.WriteLine();
@@ -105,19 +143,35 @@ namespace FeenicsCsvImport.ClassLibrary
 						}
 					}
 				}
-				finally
+				catch (Exception ex)
 				{
-					// 5. Cleanup: Always delete the file, even if the import fails
-					if (File.Exists(tempCsvPath))
-					{
-						File.Delete(tempCsvPath);
-						Console.WriteLine("Core: Temporary CSV file deleted.");
-					}
+					Console.WriteLine($"Step 4 FAILED: Acre import: {ex.GetType().FullName}: {ex.Message}");
+					Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+					throw;
+				}
+			}
+			finally
+			{
+				if (File.Exists(tempCsvPath))
+				{
+					File.Delete(tempCsvPath);
+					Console.WriteLine("Cleanup: Temporary CSV file deleted.");
 				}
 			}
 
-			// 6. Trigger the macro (if that's still part of your workflow)
-			await TriggerMacroAsync();
+			// Step 5: Trigger post-import macro
+			try
+			{
+				Console.WriteLine("Step 5: Triggering post-import macro...");
+				await TriggerMacroAsync();
+				Console.WriteLine("Step 5: Post-import macro triggered successfully.");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Step 5 FAILED: Post-import macro: {ex.GetType().FullName}: {ex.Message}");
+				Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+				throw;
+			}
 		}
 
 		// --- Helper to convert Google Sheets data to CSV ---
@@ -148,34 +202,64 @@ namespace FeenicsCsvImport.ClassLibrary
 		// Changed return type from Task to Task<IList<IList<object>>>
 		public async Task<IList<IList<object>>> ReadSheetDataAsync()
 		{
-			GoogleCredential credential = CredentialFactory.FromJson<ServiceAccountCredential>(_googleAuthJson)
-	        .ToGoogleCredential()
-	        .CreateScoped(SheetsService.Scope.SpreadsheetsReadonly);
+			Console.WriteLine("ReadSheetDataAsync: Creating Google credential...");
+			GoogleCredential credential;
+			try
+			{
+				credential = CredentialFactory.FromJson<ServiceAccountCredential>(_googleAuthJson)
+					.ToGoogleCredential()
+					.CreateScoped(SheetsService.Scope.SpreadsheetsReadonly);
+				Console.WriteLine("ReadSheetDataAsync: Credential created successfully.");
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"ReadSheetDataAsync FAILED: Create credential: {ex.GetType().FullName}: {ex.Message}");
+				throw;
+			}
 
+			Console.WriteLine("ReadSheetDataAsync: Creating SheetsService...");
 			var service = new SheetsService(new BaseClientService.Initializer()
 			{
 				HttpClientInitializer = credential,
 				ApplicationName = "GitHub Actions Automation",
 			});
 
-			var request = service.Spreadsheets.Values.Get(_spreadsheetID,_tabName);
-			var response = await request.ExecuteAsync();
-
-			// Return the raw list of rows back to the caller
-			return response.Values;
+			Console.WriteLine($"ReadSheetDataAsync: Requesting data from spreadsheet '{_spreadsheetID}', tab '{_tabName}'...");
+			try
+			{
+				var request = service.Spreadsheets.Values.Get(_spreadsheetID, _tabName);
+				var response = await request.ExecuteAsync();
+				Console.WriteLine($"ReadSheetDataAsync: Got {response.Values?.Count ?? 0} rows.");
+				return response.Values;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"ReadSheetDataAsync FAILED: Sheets API call: {ex.GetType().FullName}: {ex.Message}");
+				throw;
+			}
 		}
 
 		private async Task TriggerMacroAsync()
         {
-            Console.WriteLine("Core: Triggering Web App...");
-            using (var client = new HttpClient()){
+            Console.WriteLine($"TriggerMacroAsync: Posting to web app URL...");
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    var payload = new { Secret = _macroSecret };
+                    string jsonString = JsonSerializer.Serialize(payload);
+                    var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
 
-                var payload = new { Secret = _macroSecret };
-                string jsonString = JsonSerializer.Serialize(payload);
-                var content = new StringContent(jsonString, Encoding.UTF8, "application/json");
-
-                var response = await client.PostAsync(_webAppUrl, content);
-                response.EnsureSuccessStatusCode(); // Throws an exception if the request fails
+                    var response = await client.PostAsync(_webAppUrl, content);
+                    Console.WriteLine($"TriggerMacroAsync: Response status: {response.StatusCode}");
+                    response.EnsureSuccessStatusCode();
+                    Console.WriteLine("TriggerMacroAsync: Success.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TriggerMacroAsync FAILED: {ex.GetType().FullName}: {ex.Message}");
+                throw;
             }
         }
     }
