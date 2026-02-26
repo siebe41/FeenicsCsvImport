@@ -744,9 +744,9 @@ namespace FeenicsCsvImport.Gui
 
                 await service.PostDeskLoginEventAsync(personName);
 
-                LogMessage($"DESK LOGIN event posted for '{personName}'.");
-                MessageBox.Show($"Desk login event posted for '{personName}'.\n\nFilter by ***DESK LOGIN*** in Event History Report to find it.",
-                    "Desk Login Posted", MessageBoxButton.OK, MessageBoxImage.Information);
+                LogMessage($"DESK LOGIN note added for '{personName}'.");
+                MessageBox.Show($"Desk login note added for '{personName}'.\n\nView the person's Notes in Feenics, or search for ***DESK LOGIN*** to find all entries.",
+                    "Desk Login Recorded", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {

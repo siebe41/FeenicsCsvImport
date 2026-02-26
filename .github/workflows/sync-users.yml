@@ -24,10 +24,22 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      # 3. Download your NuGet packages (like Google.Apis and your Acre package)
+ # 1. Setup the classic NuGet package manager
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+        
+      # 2. Setup the classic MSBuild compiler
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 3. Add your Custom NuGet Feed
+      - name: Add Custom NuGet Feed
+        # Replace 'FeedName' and the URL with your actual feed details
+        run: nuget sources add -Name "feenics" -Source "https://nuget-secure.feenics.com/nuget"
+
+      # 4. Download your NuGet packages
       - name: Restore NuGet Packages
-        # IMPORTANT: Change 'YourSolution.sln' to the actual name of your .sln file
-        run: nuget restore FeenicsCsvImport.sln 
+        run: nuget restore YourSolution.sln
 
       # 4. Compile the C# code into an .exe
       - name: Build the App

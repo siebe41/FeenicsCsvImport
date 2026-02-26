@@ -1360,16 +1360,16 @@ namespace FeenicsCsvImport.ClassLibrary
         }
 
         /// <summary>
-        /// Posts a ***DESK LOGIN*** event to the Feenics event log, linked to a person found by name.
-        /// This appears in the standard Event History Report and can be filtered by the message text.
-        /// On first use, registers a custom App and EventType in the instance.
+        /// Posts a ***DESK LOGIN*** note to a person's profile in Feenics.
+        /// The note includes a timestamp and can be found by viewing the person's notes
+        /// or by exporting/searching notes for "***DESK LOGIN***".
         /// </summary>
         public async Task PostDeskLoginEventAsync(string personName)
         {
             if (string.IsNullOrWhiteSpace(personName))
                 throw new ArgumentException("Person name is required.", nameof(personName));
 
-            Log($"Posting DESK LOGIN event for '{personName}'...");
+            Log($"Posting DESK LOGIN for '{personName}'...");
 
             var client = new Client(_config.ApiUrl);
             var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
@@ -1407,79 +1407,14 @@ namespace FeenicsCsvImport.ClassLibrary
 
             Log($"Found person: '{matchedPerson.CommonName}' (Key={matchedPerson.Key})");
 
-            // Ensure our custom App exists (or find it)
-            const string appApiKey = "DeskLoginTool";
-            const string eventMoniker = "desk-login";
-            AppInfo app = null;
-
-            try
+            // Add a note to the person's profile with the desk login timestamp
+            var note = new NoteInfo
             {
-                app = await client.GetAppByApiKeyAsync(instance, appApiKey);
-                Log($"Found existing app: '{app.CommonName}' (Key={app.Key})");
+                NoteText = $"***DESK LOGIN*** — {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+            };
+            await client.AddNoteAsync(matchedPerson, note);
 
-                // Ensure it's a service app (needed for event publishing permissions)
-                if (!app.IsServiceApp)
-                {
-                    Log("Updating app to service app for event publishing permissions...");
-                    app.IsServiceApp = true;
-                    await client.UpdateAppAsync(app);
-                }
-            }
-            catch
-            {
-                Log("App not found, creating 'DeskLoginTool' app...");
-                app = await client.AddAppAsync(instance, new AppInfo
-                {
-                    CommonName = "Desk Login Tool",
-                    ApiKey = appApiKey,
-                    IsServiceApp = true
-                });
-                Log($"Created app: '{app.CommonName}' (Key={app.Key})");
-            }
-
-            // Ensure our custom EventType exists under the app
-            var moniker = new MonikerItem { Namespace = appApiKey, Nickname = eventMoniker };
-            EventTypeInfo eventType = null;
-
-            try
-            {
-                eventType = await client.GetEventTypeForAppByMonikerAsync(app, moniker);
-                Log($"Found existing event type: '{eventType.CommonName}' (Key={eventType.Key})");
-            }
-            catch
-            {
-                Log("Event type not found, creating 'DESK LOGIN' event type...");
-                eventType = await client.AddEventTypeToAppAsync(app, new EventTypeInfo
-                {
-                    CommonName = "DESK LOGIN",
-                    MessageTemplateLong = "***DESK LOGIN*** - {PersonName}",
-                    MessageTemplateShort = "***DESK LOGIN***",
-                    Priority = 0,
-                    RequiresAcknowledgement = false,
-                    NonLogging = false,
-                    Monikers = new[] { moniker }
-                });
-                Log($"Created event type: '{eventType.CommonName}' (Key={eventType.Key})");
-            }
-
-            // Publish the event linked to the person
-            await client.PublishEventAsync(
-                instance,
-                appApiKey,
-                moniker,
-                DateTime.UtcNow,
-                new { PersonName = matchedPerson.CommonName, PersonKey = matchedPerson.Key },
-                new[]
-                {
-                    new ObjectLinkItem
-                    {
-                        LinkedObjectKey = matchedPerson.Key,
-                        CommonName = matchedPerson.CommonName,
-                        Relation = "Person"
-                    }
-                });
-
-            Log($"DESK LOGIN event posted for '{matchedPerson.CommonName}'.");
+            Log($"DESK LOGIN note added for '{matchedPerson.CommonName}'.");
         }
     }
 }
