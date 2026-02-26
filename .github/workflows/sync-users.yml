@@ -37,6 +37,17 @@ jobs:
         # Replace 'FeedName' and the URL with your actual feed details
         run: nuget sources add -Name "feenics" -Source "https://nuget-secure.feenics.com/nuget"
 
+- name: Patch NuGet Config for HTTP Bypass
+        run: |
+          $configPath = "$env:APPDATA\NuGet\NuGet.Config"
+          [xml]$config = Get-Content $configPath
+          
+          # Find the 'feenics' source you just added and append the bypass flag
+          $node = $config.configuration.packageSources.add | Where-Object { $_.key -eq 'feenics' }
+          if ($node) {
+              $node.SetAttribute('allowInsecureConnections', 'true')
+              $config.Save($configPath)
+          }
       # 4. Download your NuGet packages
       - name: Restore NuGet Packages
         run: nuget restore FeenicsCsvImport.sln
