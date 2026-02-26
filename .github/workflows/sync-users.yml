@@ -39,7 +39,7 @@ jobs:
 
       # 4. Download your NuGet packages
       - name: Restore NuGet Packages
-        run: nuget restore YourSolution.sln
+        run: nuget restore FeenicsCsvImport.sln
 
       # 4. Compile the C# code into an .exe
       - name: Build the App
