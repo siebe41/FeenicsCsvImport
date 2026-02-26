@@ -56,6 +56,8 @@ jobs:
           WEB_APP_URL: ${{ secrets.WEB_APP_URL }}
           MACRO_SECRET: ${{ secrets.MACRO_SECRET }}
           ACRE_INSTANCE: ${{ secrets.ACRE_INSTANCE }}
+          ACRE_PASS: ${{ secrets.ACRE_PASS }}
+          ACRE_USER: ${{ secrets.ACRE_USER }}
           
       # IMPORTANT: This path must match exactly where MSBuild drops your compiled .exe
         # Usually, it is inside the project folder under \bin\Release\
