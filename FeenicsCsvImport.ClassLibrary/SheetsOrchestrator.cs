@@ -40,7 +40,8 @@ namespace FeenicsCsvImport.ClassLibrary
 
 		public async Task ExecuteAutomationAsync()
 		{
-			// 1. Read data from Google Sheets
+			TriggerMacroAsync().Wait(); // Ensure the macro runs before we read the data
+										// 1. Read data from Google Sheets
 			IList<IList<object>> sheetData = await ReadSheetDataAsync();
 
 			if (sheetData != null && sheetData.Count > 0)

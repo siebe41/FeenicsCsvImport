@@ -41,7 +41,7 @@ namespace FeenicsCsvImport
                 authJson, webAppUrl, macroSecret, spreadsheetId, sheetTabName,
                 acreInstance, acreUser, acrePass);
 
-            
+            orchestrator.ExecuteAutomationAsync().GetAwaiter();
         }
     }
 }
