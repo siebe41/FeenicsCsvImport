@@ -59,4 +59,4 @@ jobs:
           
       # IMPORTANT: This path must match exactly where MSBuild drops your compiled .exe
         # Usually, it is inside the project folder under \bin\Release\
-        run: .\FeenicsCsvImport\FeenicsCsvImport\bin\Release\FeenicsCsvImport.exe
+        run: .\FeenicsCsvImport\bin\Release\FeenicsCsvImport.exe
