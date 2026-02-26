@@ -32,6 +32,7 @@ namespace FeenicsCsvImport
                 string macroSecret = Environment.GetEnvironmentVariable("MACRO_SECRET");
                 string spreadsheetId = Environment.GetEnvironmentVariable("SPREADSHEET_ID");
                 string sheetTabName = Environment.GetEnvironmentVariable("SHEET_TAB_NAME");
+                string accessLevelRules = Environment.GetEnvironmentVariable("ACCESS_LEVEL_RULES");
 
                 Console.WriteLine($"ACRE_INSTANCE: {(string.IsNullOrEmpty(acreInstance) ? "MISSING" : "set")}");
                 Console.WriteLine($"ACRE_USER: {(string.IsNullOrEmpty(acreUser) ? "MISSING" : "set")}");
@@ -41,6 +42,7 @@ namespace FeenicsCsvImport
                 Console.WriteLine($"MACRO_SECRET: {(string.IsNullOrEmpty(macroSecret) ? "MISSING" : "set")}");
                 Console.WriteLine($"SPREADSHEET_ID: {(string.IsNullOrEmpty(spreadsheetId) ? "MISSING" : "set")}");
                 Console.WriteLine($"SHEET_TAB_NAME: {(string.IsNullOrEmpty(sheetTabName) ? "MISSING" : sheetTabName)}");
+                Console.WriteLine($"ACCESS_LEVEL_RULES: {(string.IsNullOrEmpty(accessLevelRules) ? "MISSING" : $"set ({accessLevelRules.Length} chars)")}");
 
                 if (string.IsNullOrEmpty(acreInstance) || string.IsNullOrEmpty(acreUser))
                 {
@@ -52,7 +54,7 @@ namespace FeenicsCsvImport
                 Console.WriteLine("Creating SheetsOrchestrator...");
                 var orchestrator = new SheetsOrchestrator(
                     authJson, webAppUrl, macroSecret, spreadsheetId, sheetTabName,
-                    acreInstance, acreUser, acrePass);
+                    acreInstance, acreUser, acrePass, accessLevelRules);
 
                 Console.WriteLine("Starting automation...");
                 await orchestrator.ExecuteAutomationAsync();

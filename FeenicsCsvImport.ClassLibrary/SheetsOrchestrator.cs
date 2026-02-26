@@ -18,15 +18,18 @@ namespace FeenicsCsvImport.ClassLibrary
         private readonly string _webAppUrl;
         private readonly string _macroSecret;
         private readonly string _spreadsheetID;
-        private readonly string _tabName; private readonly string _acreInstance;
+        private readonly string _tabName;
+        private readonly string _acreInstance;
 		private readonly string _acreUser;
 		private readonly string _acrePass;
+		private readonly string _accessLevelRulesJson;
 
 		// The constructor demands the secrets be passed in
 		public SheetsOrchestrator(
 			string googleAuthJson, string webAppUrl, string macroSecret,
 			string spreadsheetId, string sheetTabName,
-			string acreInstance, string acreUser, string acrePass)
+			string acreInstance, string acreUser, string acrePass,
+			string accessLevelRulesJson)
 		{			
             _googleAuthJson = googleAuthJson ?? throw new ArgumentNullException(nameof(googleAuthJson));
             _webAppUrl = webAppUrl ?? throw new ArgumentNullException(nameof(webAppUrl));
@@ -36,6 +39,7 @@ namespace FeenicsCsvImport.ClassLibrary
 			_acreInstance = acreInstance ?? throw new ArgumentNullException(nameof(acreInstance));
 			_acreUser = acreUser ?? throw new ArgumentNullException(nameof(acreUser));
 			_acrePass = acrePass ?? throw new ArgumentNullException(nameof(acrePass));
+			_accessLevelRulesJson = accessLevelRulesJson ?? throw new ArgumentNullException(nameof(accessLevelRulesJson));
 		}
 
 		public async Task ExecuteAutomationAsync()
@@ -97,17 +101,27 @@ namespace FeenicsCsvImport.ClassLibrary
 				try
 				{
 					Console.WriteLine("Step 4: Configuring Acre Security import...");
+
+					Console.WriteLine("Step 4: Parsing access level rules from JSON...");
+					var accessLevelRules = AccessLevelRule.ParseFromJson(_accessLevelRulesJson);
+					Console.WriteLine($"Step 4: Parsed {accessLevelRules.Count} access level rule(s):");
+					foreach (var rule in accessLevelRules)
+					{
+						Console.WriteLine($"  - {rule.Name} (Age {rule.AgeRangeDisplay})");
+					}
+
 					var config = new ImportConfiguration
 					{
 						ApiUrl = "https://api.us.acresecurity.cloud",
 						Instance = _acreInstance,
 						Username = _acreUser,
 						Password = _acrePass,
-						DuplicateHandling = DuplicateHandling.Skip,
+						DuplicateHandling = DuplicateHandling.Update,
 						ApiCallDelayMs = 100,
 						MaxRetries = 5,
 						InitialRetryDelayMs = 1000,
-						MaxRetryDelayMs = 30000
+						MaxRetryDelayMs = 30000,
+						AccessLevelRules = accessLevelRules
 					};
 
 					var service = new ImportService(config, Console.WriteLine);

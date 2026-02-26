@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.Json;
 
 namespace FeenicsCsvImport.ClassLibrary
 {
@@ -57,6 +59,54 @@ namespace FeenicsCsvImport.ClassLibrary
                     return $"{StartAge}-{EndAge.Value}";
                 return $"{StartAge}+";
             }
+        }
+
+        /// <summary>
+        /// Parses a JSON string into a list of AccessLevelRules.
+        /// Expected format: [{"Name":"Pool","StartAge":12,"EndAge":14}, ...]
+        /// If EndAge is null, 0, or missing, it defaults to StartAge + 50.
+        /// </summary>
+        public static List<AccessLevelRule> ParseFromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                throw new ArgumentException("Access level rules JSON is required.", nameof(json));
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+
+            var parsed = JsonSerializer.Deserialize<List<JsonRuleEntry>>(json, options);
+            if (parsed == null || parsed.Count == 0)
+                throw new InvalidOperationException("Access level rules JSON contained no rules.");
+
+            var rules = new List<AccessLevelRule>();
+            foreach (var entry in parsed)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name))
+                    throw new InvalidOperationException("Each access level rule must have a Name.");
+
+                int? endAge = entry.EndAge;
+                if (!endAge.HasValue || endAge.Value <= 0)
+                    endAge = entry.StartAge + 50;
+
+                rules.Add(new AccessLevelRule
+                {
+                    Name = entry.Name,
+                    StartAge = entry.StartAge,
+                    EndAge = endAge,
+                    CreateIfMissing = false
+                });
+            }
+
+            return rules;
+        }
+
+        private class JsonRuleEntry
+        {
+            public string Name { get; set; }
+            public int StartAge { get; set; }
+            public int? EndAge { get; set; }
         }
     }
 }
