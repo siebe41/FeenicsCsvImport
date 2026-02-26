@@ -677,6 +677,7 @@ namespace FeenicsCsvImport.Gui
             btnDisableCards.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
             btnDeleteCsv.IsEnabled = enabled && !string.IsNullOrEmpty(_selectedFilePath);
             btnDeleteAll.IsEnabled = enabled;
+            btnDeskLogin.IsEnabled = enabled;
             btnCancel.IsEnabled = !enabled;
             txtApiUrl.IsEnabled = enabled;
             txtInstance.IsEnabled = enabled;
@@ -685,7 +686,7 @@ namespace FeenicsCsvImport.Gui
             dgRules.IsEnabled = enabled;
             rbSkip.IsEnabled = enabled;
             rbUpdate.IsEnabled = enabled;
-            rbCreateNew.IsEnabled = enabled;
+            rbCreateNew.IsChecked = enabled;
             btnSaveSettings.IsEnabled = enabled;
             btnLoadAccessLevels.IsEnabled = enabled;
             btnExportTemplate.IsEnabled = enabled;
@@ -698,6 +699,66 @@ namespace FeenicsCsvImport.Gui
                 txtLog.AppendText($"[{DateTime.Now:HH:mm:ss}] {message}\n");
                 txtLog.ScrollToEnd();
             });
+        }
+
+        private async void BtnDeskLogin_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtApiUrl.Text) ||
+                string.IsNullOrWhiteSpace(txtInstance.Text) ||
+                string.IsNullOrWhiteSpace(txtUsername.Text) ||
+                string.IsNullOrWhiteSpace(txtPassword.Password))
+            {
+                MessageBox.Show("Please enter API URL, Instance, Username, and Password.", "Missing Settings", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Simple input dialog using a child window
+            var dialog = new Window
+            {
+                Title = "Desk Login",
+                Width = 400, Height = 160,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize
+            };
+            var panel = new System.Windows.Controls.StackPanel { Margin = new Thickness(15) };
+            panel.Children.Add(new System.Windows.Controls.TextBlock { Text = "Enter the person's name exactly as it appears in Feenics:", Margin = new Thickness(0, 0, 0, 8) });
+            var nameBox = new System.Windows.Controls.TextBox { Margin = new Thickness(0, 0, 0, 12) };
+            panel.Children.Add(nameBox);
+            var okBtn = new System.Windows.Controls.Button { Content = "Post Event", Width = 100, HorizontalAlignment = HorizontalAlignment.Right };
+            okBtn.Click += (s, a) => { dialog.DialogResult = true; };
+            panel.Children.Add(okBtn);
+            dialog.Content = panel;
+            nameBox.Focus();
+
+            if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(nameBox.Text))
+                return;
+
+            var personName = nameBox.Text.Trim();
+            SetUIEnabled(false);
+
+            try
+            {
+                var config = CreateConfiguration();
+                var service = new ImportService(config, LogMessage);
+
+                await service.PostDeskLoginEventAsync(personName);
+
+                LogMessage($"DESK LOGIN event posted for '{personName}'.");
+                MessageBox.Show($"Desk login event posted for '{personName}'.\n\nFilter by ***DESK LOGIN*** in Event History Report to find it.",
+                    "Desk Login Posted", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                var details = ImportService.FormatExceptionDetails(ex);
+                LogMessage($"Desk login failed: {ex.Message}");
+                LogMessage($"  {details}");
+                MessageBox.Show($"Desk login failed: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                SetUIEnabled(true);
+            }
         }
     }
 }

@@ -1358,5 +1358,128 @@ namespace FeenicsCsvImport.ClassLibrary
 
             return (deleted, skipped, failed, errors);
         }
+
+        /// <summary>
+        /// Posts a ***DESK LOGIN*** event to the Feenics event log, linked to a person found by name.
+        /// This appears in the standard Event History Report and can be filtered by the message text.
+        /// On first use, registers a custom App and EventType in the instance.
+        /// </summary>
+        public async Task PostDeskLoginEventAsync(string personName)
+        {
+            if (string.IsNullOrWhiteSpace(personName))
+                throw new ArgumentException("Person name is required.", nameof(personName));
+
+            Log($"Posting DESK LOGIN event for '{personName}'...");
+
+            var client = new Client(_config.ApiUrl);
+            var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
+            if (!success)
+                throw new Exception($"Login failed: {msg}");
+
+            var instance = await client.GetCurrentInstanceAsync();
+            Log($"Connected to: {instance.CommonName}");
+
+            // Find the person by name
+            PersonInfo matchedPerson = null;
+            int page = 0;
+            const int pageSize = 1000;
+            while (true)
+            {
+                var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                if (peoplePage == null || !peoplePage.Any())
+                    break;
+
+                matchedPerson = peoplePage.FirstOrDefault(p =>
+                    string.Equals(p.CommonName, personName, StringComparison.OrdinalIgnoreCase));
+
+                if (matchedPerson != null)
+                    break;
+
+                if (peoplePage.Count() < pageSize)
+                    break;
+
+                page++;
+                await Task.Delay(_config.ApiCallDelayMs);
+            }
+
+            if (matchedPerson == null)
+                throw new Exception($"Person '{personName}' not found in instance.");
+
+            Log($"Found person: '{matchedPerson.CommonName}' (Key={matchedPerson.Key})");
+
+            // Ensure our custom App exists (or find it)
+            const string appApiKey = "DeskLoginTool";
+            const string eventMoniker = "desk-login";
+            AppInfo app = null;
+
+            try
+            {
+                app = await client.GetAppByApiKeyAsync(instance, appApiKey);
+                Log($"Found existing app: '{app.CommonName}' (Key={app.Key})");
+
+                // Ensure it's a service app (needed for event publishing permissions)
+                if (!app.IsServiceApp)
+                {
+                    Log("Updating app to service app for event publishing permissions...");
+                    app.IsServiceApp = true;
+                    await client.UpdateAppAsync(app);
+                }
+            }
+            catch
+            {
+                Log("App not found, creating 'DeskLoginTool' app...");
+                app = await client.AddAppAsync(instance, new AppInfo
+                {
+                    CommonName = "Desk Login Tool",
+                    ApiKey = appApiKey,
+                    IsServiceApp = true
+                });
+                Log($"Created app: '{app.CommonName}' (Key={app.Key})");
+            }
+
+            // Ensure our custom EventType exists under the app
+            var moniker = new MonikerItem { Namespace = appApiKey, Nickname = eventMoniker };
+            EventTypeInfo eventType = null;
+
+            try
+            {
+                eventType = await client.GetEventTypeForAppByMonikerAsync(app, moniker);
+                Log($"Found existing event type: '{eventType.CommonName}' (Key={eventType.Key})");
+            }
+            catch
+            {
+                Log("Event type not found, creating 'DESK LOGIN' event type...");
+                eventType = await client.AddEventTypeToAppAsync(app, new EventTypeInfo
+                {
+                    CommonName = "DESK LOGIN",
+                    MessageTemplateLong = "***DESK LOGIN*** - {PersonName}",
+                    MessageTemplateShort = "***DESK LOGIN***",
+                    Priority = 0,
+                    RequiresAcknowledgement = false,
+                    NonLogging = false,
+                    Monikers = new[] { moniker }
+                });
+                Log($"Created event type: '{eventType.CommonName}' (Key={eventType.Key})");
+            }
+
+            // Publish the event linked to the person
+            await client.PublishEventAsync(
+                instance,
+                appApiKey,
+                moniker,
+                DateTime.UtcNow,
+                new { PersonName = matchedPerson.CommonName, PersonKey = matchedPerson.Key },
+                new[]
+                {
+                    new ObjectLinkItem
+                    {
+                        LinkedObjectKey = matchedPerson.Key,
+                        CommonName = matchedPerson.CommonName,
+                        Relation = "Person"
+                    }
+                });
+
+            Log($"DESK LOGIN event posted for '{matchedPerson.CommonName}'.");
+        }
     }
 }

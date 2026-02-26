@@ -137,6 +137,9 @@
 
         <!-- Action Buttons -->
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnDeskLogin" Content="Desk Login" Width="110" Height="35"
+                    Click="BtnDeskLogin_Click" Margin="0,0,10,0"
+                    Background="#1976D2" Foreground="White" FontWeight="Bold"/>
             <Button x:Name="btnDeleteAll" Content="Delete All People" Width="140" Height="35" 
                     Click="BtnDeleteAll_Click" Margin="0,0,10,0"
                     Background="#D32F2F" Foreground="White" FontWeight="Bold"/>

@@ -20,59 +20,28 @@ namespace FeenicsCsvImport
     {
         static async Task Main(string[] args)
         {
-            // Configure the import service
-            var config = new ImportConfiguration
+
+            string acreInstance = Environment.GetEnvironmentVariable("ACRE_INSTANCE");
+            string acreUser = Environment.GetEnvironmentVariable("ACRE_USER");
+            string acrePass = Environment.GetEnvironmentVariable("ACRE_PASS");
+            string authJson = Environment.GetEnvironmentVariable("GOOGLE_AUTH_JSON");
+            string webAppUrl = Environment.GetEnvironmentVariable("WEB_APP_URL");
+            string macroSecret = Environment.GetEnvironmentVariable("MACRO_SECRET");
+            string spreadsheetId = Environment.GetEnvironmentVariable("SPREADSHEET_ID");
+            string sheetTabName = Environment.GetEnvironmentVariable("SHEET_TAB_NAME");
+
+            if (string.IsNullOrEmpty(acreInstance) || string.IsNullOrEmpty(acreUser))
             {
-                ApiUrl = "https://api.us.acresecurity.cloud",
-                Instance = "YOUR_INSTANCE",
-                Username = "YOUR_USER",
-                Password = "YOUR_PASS",
-                DuplicateHandling = DuplicateHandling.Skip,
-                AccessLevelRules = new List<AccessLevelRule>
-                {
-                    new AccessLevelRule { Name = "PoolOnlyAccess-Age12", StartAge = 12, EndAge = 14, CreateIfMissing = false },
-                    new AccessLevelRule { Name = "PoolAndGymAccess-Age14", StartAge = 14, EndAge = 18, CreateIfMissing = false },
-                    new AccessLevelRule { Name = "PoolAndGymAfterHoursAccess-Age18", StartAge = 18, EndAge = null, CreateIfMissing = false }
-                },
-                ApiCallDelayMs = 100,
-                MaxRetries = 5,
-                InitialRetryDelayMs = 1000,
-                MaxRetryDelayMs = 30000
-            };
-
-            // Create service with console logging
-            var service = new ImportService(config, Console.WriteLine);
-
-            // Execute import
-            var result = await service.ExecuteImportAsync("users.csv");
-
-            // Report final results
-            Console.WriteLine();
-            Console.WriteLine("=== Import Summary ===");
-            Console.WriteLine($"Success: {result.Success}");
-            Console.WriteLine($"People Created: {result.PeopleCreated}");
-            Console.WriteLine($"People Updated: {result.PeopleUpdated}");
-            Console.WriteLine($"Access Levels Assigned: {result.AccessLevelsAssigned}");
-
-            if (result.Errors.Count > 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine("Errors:");
-                foreach (var error in result.Errors)
-                {
-                    Console.WriteLine($"  - {error}");
-                }
+                Console.WriteLine("Failed to start: Missing Acre environment variables.");
+                return;
             }
 
-            if (result.Warnings.Count > 0)
-            {
-                Console.WriteLine();
-                Console.WriteLine("Warnings:");
-                foreach (var warning in result.Warnings)
-                {
-                    Console.WriteLine($"  - {warning}");
-                }
-            }
+            // Pass the new variables into your orchestrator
+            var orchestrator = new SheetsOrchestrator(
+                authJson, webAppUrl, macroSecret, spreadsheetId, sheetTabName,
+                acreInstance, acreUser, acrePass);
+
+            
         }
     }
 }

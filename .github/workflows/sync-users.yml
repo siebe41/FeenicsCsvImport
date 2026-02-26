@@ -1,0 +1,49 @@
+name: Sync Sheets to Acre Security
+
+on:
+  workflow_dispatch: 
+  schedule:
+    # Your 10:00 AM to 8:45 PM CST schedule
+    - cron: '*/15 16-23 * * *'
+    - cron: '*/15 0-2 * * *'
+
+jobs:
+  run-import:
+    # CRITICAL CHANGE: This tells GitHub to use a Windows Virtual Machine
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 1. Setup the classic NuGet package manager
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+        
+      # 2. Setup the classic MSBuild compiler
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # 3. Download your NuGet packages (like Google.Apis and your Acre package)
+      - name: Restore NuGet Packages
+        # IMPORTANT: Change 'YourSolution.sln' to the actual name of your .sln file
+        run: nuget restore FeenicsCsvImport.sln 
+
+      # 4. Compile the C# code into an .exe
+      - name: Build the App
+        # IMPORTANT: Change 'YourSolution.sln' to the actual name of your .sln file
+        run: msbuild FeenicsCsvImport.sln /p:Configuration=Release
+
+      # 5. Inject Secrets and Run the compiled executable
+      - name: Run feenicscsvimport
+        env:
+          GOOGLE_AUTH_JSON: ${{ secrets.GOOGLE_AUTH_JSON }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          SHEET_TAB_NAME: ${{ secrets.SHEET_TAB_NAME }} 
+          WEB_APP_URL: ${{ secrets.WEB_APP_URL }}
+          MACRO_SECRET: ${{ secrets.MACRO_SECRET }}
+          ACRE_INSTANCE: ${{ secrets.ACRE_INSTANCE }}
+          
+      # IMPORTANT: This path must match exactly where MSBuild drops your compiled .exe
+        # Usually, it is inside the project folder under \bin\Release\
+        run: .\FeenicsCsvImport\FeenicsCsvImport\bin\Release\FeenicsCsvImport.exe
