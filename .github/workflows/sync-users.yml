@@ -43,10 +43,9 @@ jobs:
       - name: Restore NuGet Packages
         run: nuget restore FeenicsCsvImport.sln
 
-      # 4. Compile the C# code into an .exe
+# 4. Compile the C# code into an .exe
       - name: Build the App
-        # IMPORTANT: Change 'YourSolution.sln' to the actual name of your .sln file
-        run: msbuild FeenicsCsvImport.sln /p:Configuration=Release
+        run: msbuild .\FeenicsCsvImport\FeenicsCsvImport.csproj /p:Configuration=Release
 
       # 5. Inject Secrets and Run the compiled executable
       - name: Run feenicscsvimport
