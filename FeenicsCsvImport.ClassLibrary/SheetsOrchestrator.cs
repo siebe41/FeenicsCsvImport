@@ -110,7 +110,7 @@ namespace FeenicsCsvImport.ClassLibrary
 						Console.WriteLine($"  - {rule.Name} (Age {rule.AgeRangeDisplay})");
 					}
 
-					var config = new ImportConfiguration
+                    var config = new ImportConfiguration
 					{
 						ApiUrl = "https://api.us.acresecurity.cloud",
 						Instance = _acreInstance,

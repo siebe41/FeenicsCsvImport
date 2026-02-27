@@ -694,6 +694,11 @@ namespace FeenicsCsvImport.ClassLibrary
                         {
                             try
                             {
+                                // Remove existing birthday note if present
+                                await ExecuteWithRetryAsync(
+                                    () => RemoveExistingNoteAsync(client, capturedPerson, "Birthday:"),
+                                    $"Remove old birthday note for '{capturedName}'");
+
                                 var note = new NoteInfo
                                 {
                                     NoteText = $"Birthday: {capturedBirthday:MMMM d, yyyy}"
@@ -1361,8 +1366,7 @@ namespace FeenicsCsvImport.ClassLibrary
 
         /// <summary>
         /// Posts a ***DESK LOGIN*** note to a person's profile in Feenics.
-        /// The note includes a timestamp and can be found by viewing the person's notes
-        /// or by exporting/searching notes for "***DESK LOGIN***".
+        /// If a DESK LOGIN note already exists, it is replaced with the new one.
         /// </summary>
         public async Task PostDeskLoginEventAsync(string personName)
         {
@@ -1407,6 +1411,9 @@ namespace FeenicsCsvImport.ClassLibrary
 
             Log($"Found person: '{matchedPerson.CommonName}' (Key={matchedPerson.Key})");
 
+            // Remove existing DESK LOGIN note if present
+            await RemoveExistingNoteAsync(client, matchedPerson, "***DESK LOGIN***");
+
             // Add a note to the person's profile with the desk login timestamp
             var note = new NoteInfo
             {
@@ -1415,6 +1422,110 @@ namespace FeenicsCsvImport.ClassLibrary
             await client.AddNoteAsync(matchedPerson, note);
 
             Log($"DESK LOGIN note added for '{matchedPerson.CommonName}'.");
+        }
+
+        /// <summary>
+        /// Finds a person by their badge/card number and adds a DESK LOGIN note.
+        /// If a DESK LOGIN note already exists, it is replaced with the new one.
+        /// </summary>
+        public async Task PostDeskLoginByCardAsync(string cardNumber)
+        {
+            if (string.IsNullOrWhiteSpace(cardNumber))
+                throw new ArgumentException("Card number is required.", nameof(cardNumber));
+
+            Log($"Processing scan for card: {cardNumber}...");
+
+            var client = new Client(_config.ApiUrl);
+            var (success, error, msg) = await client.LoginAsync(_config.Instance, _config.Username, _config.Password);
+            if (!success) throw new Exception($"Login failed: {msg}");
+
+            var instance = await client.GetCurrentInstanceAsync();
+
+            // Look up the person by card number
+            PersonInfo matchedPerson = null;
+            if (long.TryParse(cardNumber, out long cardNum))
+            {
+                try
+                {
+                    var folder = await client.GetFolderAsync(instance.InFolderHref);
+                    matchedPerson = await client.GetPersonByActiveCardAsync(folder, cardNum);
+                }
+                catch (Exception ex)
+                {
+                    Log($"Card lookup failed, falling back to full search: {ex.Message}");
+                }
+            }
+
+            // Fallback: search all people and check their card assignments
+            if (matchedPerson == null)
+            {
+                Log($"Searching all people for card {cardNumber}...");
+                int page = 0;
+                const int pageSize = 1000;
+                while (true)
+                {
+                    var peoplePage = await client.GetPeopleAsync(instance, page, pageSize);
+                    if (peoplePage == null || !peoplePage.Any())
+                        break;
+
+                    foreach (var person in peoplePage)
+                    {
+                        if (person.CardAssignments == null) continue;
+                        foreach (var card in person.CardAssignments)
+                        {
+                            if (card.DisplayCardNumber == cardNumber ||
+                                card.EncodedCardNumber.ToString() == cardNumber)
+                            {
+                                matchedPerson = person;
+                                break;
+                            }
+                        }
+                        if (matchedPerson != null) break;
+                    }
+
+                    if (matchedPerson != null) break;
+                    if (peoplePage.Count() < pageSize) break;
+                    page++;
+                    await Task.Delay(_config.ApiCallDelayMs);
+                }
+            }
+
+            if (matchedPerson == null)
+            {
+                Log($"No person found associated with card {cardNumber}.");
+                return;
+            }
+
+            Log($"Found: {matchedPerson.CommonName}. Updating DESK LOGIN note...");
+
+            // Remove existing DESK LOGIN note if present
+            await RemoveExistingNoteAsync(client, matchedPerson, "***DESK LOGIN***");
+
+            var note = new NoteInfo
+            {
+                NoteText = $"***DESK LOGIN*** — {DateTime.Now:yyyy-MM-dd HH:mm:ss}"
+            };
+
+            await client.AddNoteAsync(matchedPerson, note);
+            Log($"DESK LOGIN note added for '{matchedPerson.CommonName}'.");
+        }
+
+        /// <summary>
+        /// Removes existing notes from a person that start with the given prefix.
+        /// </summary>
+        private async Task RemoveExistingNoteAsync(Client client, PersonInfo person, string prefix)
+        {
+            if (person.Notes == null || person.Notes.Length == 0)
+                return;
+
+            foreach (var existing in person.Notes)
+            {
+                if (existing.NoteText != null && existing.NoteText.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log($"Removing existing note for '{person.CommonName}': {existing.NoteText}");
+                    await client.RemoveNoteAsync(person, existing);
+                }
+            }
         }
     }
 }
