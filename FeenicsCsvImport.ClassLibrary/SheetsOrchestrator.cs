@@ -45,18 +45,18 @@ namespace FeenicsCsvImport.ClassLibrary
 		public async Task ExecuteAutomationAsync()
 		{
 			// Step 1: Trigger macro to refresh sheet data
-			try
-			{
-				Console.WriteLine("Step 1: Triggering macro to refresh sheet data...");
-				await TriggerMacroAsync();
-				Console.WriteLine("Step 1: Macro triggered successfully.");
-			}
-			catch (Exception ex)
-			{
-				Console.WriteLine($"Step 1 FAILED: Trigger macro: {ex.GetType().FullName}: {ex.Message}");
-				Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-				throw;
-			}
+			//try
+			//{
+			//	Console.WriteLine("Step 1: Triggering macro to refresh sheet data...");
+			//	await TriggerMacroAsync();
+			//	Console.WriteLine("Step 1: Macro triggered successfully.");
+			//}
+			//catch (Exception ex)
+			//{
+			//	Console.WriteLine($"Step 1 FAILED: Trigger macro: {ex.GetType().FullName}: {ex.Message}");
+			//	Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+			//	throw;
+			//}
 
 			// Step 2: Read data from Google Sheets
 			IList<IList<object>> sheetData;
