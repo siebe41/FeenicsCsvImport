@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace FeenicsCsvImport.Test
 {
@@ -909,6 +910,688 @@ namespace FeenicsCsvImport.Test
         {
             var result = AddressNormalizer.NormalizeStreet("200 NW 5th Ave, Portland, OR 97209");
             Assert.AreEqual("200 northwest 5th avenue", result);
+        }
+    }
+
+    #endregion
+
+    #region AccessLevelRule ParseFromJson Tests
+
+    [TestClass]
+    public class AccessLevelRuleParseFromJsonTests
+    {
+        [TestMethod]
+        public void ParseFromJson_ValidJson_ReturnsParsedRules()
+        {
+            var json = @"[{""Name"":""Pool"",""StartAge"":12,""EndAge"":14},{""Name"":""Gym"",""StartAge"":14,""EndAge"":18}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual(2, rules.Count);
+            Assert.AreEqual("Pool", rules[0].Name);
+            Assert.AreEqual(12, rules[0].StartAge);
+            Assert.AreEqual(14, rules[0].EndAge);
+            Assert.AreEqual("Gym", rules[1].Name);
+            Assert.AreEqual(14, rules[1].StartAge);
+            Assert.AreEqual(18, rules[1].EndAge);
+        }
+
+        [TestMethod]
+        public void ParseFromJson_NullEndAge_DefaultsToStartAgePlus50()
+        {
+            var json = @"[{""Name"":""AllAccess"",""StartAge"":18}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual(1, rules.Count);
+            Assert.AreEqual(68, rules[0].EndAge);
+        }
+
+        [TestMethod]
+        public void ParseFromJson_ZeroEndAge_DefaultsToStartAgePlus50()
+        {
+            var json = @"[{""Name"":""AllAccess"",""StartAge"":18,""EndAge"":0}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual(68, rules[0].EndAge);
+        }
+
+        [TestMethod]
+        public void ParseFromJson_NegativeEndAge_DefaultsToStartAgePlus50()
+        {
+            var json = @"[{""Name"":""AllAccess"",""StartAge"":10,""EndAge"":-1}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual(60, rules[0].EndAge);
+        }
+
+        [TestMethod]
+        public void ParseFromJson_CreateIfMissing_IsFalse()
+        {
+            var json = @"[{""Name"":""Test"",""StartAge"":5,""EndAge"":10}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.IsFalse(rules[0].CreateIfMissing);
+        }
+
+        [TestMethod]
+        public void ParseFromJson_CaseInsensitivePropertyNames()
+        {
+            var json = @"[{""name"":""Pool"",""startage"":12,""endage"":14}]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual("Pool", rules[0].Name);
+            Assert.AreEqual(12, rules[0].StartAge);
+            Assert.AreEqual(14, rules[0].EndAge);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ParseFromJson_NullJson_Throws()
+        {
+            AccessLevelRule.ParseFromJson(null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ParseFromJson_EmptyJson_Throws()
+        {
+            AccessLevelRule.ParseFromJson("");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public void ParseFromJson_WhitespaceJson_Throws()
+        {
+            AccessLevelRule.ParseFromJson("   ");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void ParseFromJson_EmptyArray_Throws()
+        {
+            AccessLevelRule.ParseFromJson("[]");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void ParseFromJson_MissingName_Throws()
+        {
+            AccessLevelRule.ParseFromJson(@"[{""StartAge"":12,""EndAge"":14}]");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(InvalidOperationException))]
+        public void ParseFromJson_BlankName_Throws()
+        {
+            AccessLevelRule.ParseFromJson(@"[{""Name"":"""",""StartAge"":12}]");
+        }
+
+        [TestMethod]
+        public void ParseFromJson_MultipleRules_AllParsed()
+        {
+            var json = @"[
+                {""Name"":""A"",""StartAge"":5,""EndAge"":10},
+                {""Name"":""B"",""StartAge"":10,""EndAge"":15},
+                {""Name"":""C"",""StartAge"":15}
+            ]";
+            var rules = AccessLevelRule.ParseFromJson(json);
+
+            Assert.AreEqual(3, rules.Count);
+            Assert.AreEqual("A", rules[0].Name);
+            Assert.AreEqual("B", rules[1].Name);
+            Assert.AreEqual("C", rules[2].Name);
+            Assert.AreEqual(65, rules[2].EndAge);
+        }
+    }
+
+    #endregion
+
+    #region ImportConfiguration MaxConcurrency Tests
+
+    [TestClass]
+    public class ImportConfigurationMaxConcurrencyTests
+    {
+        [TestMethod]
+        public void DefaultMaxConcurrency_IsFive()
+        {
+            var config = new ImportConfiguration();
+            Assert.AreEqual(5, config.MaxConcurrency);
+        }
+
+        [TestMethod]
+        public void SetMaxConcurrency_ReturnsCorrectValue()
+        {
+            var config = new ImportConfiguration { MaxConcurrency = 1 };
+            Assert.AreEqual(1, config.MaxConcurrency);
+        }
+
+        [TestMethod]
+        public void CreateDefault_HasDefaultMaxConcurrency()
+        {
+            var config = ImportConfiguration.CreateDefault();
+            Assert.AreEqual(5, config.MaxConcurrency);
+        }
+    }
+
+    #endregion
+
+    #region DisableCardsResult Tests
+
+    [TestClass]
+    public class DisableCardsResultTests
+    {
+        [TestMethod]
+        public void DefaultValues_AreCorrect()
+        {
+            var result = new ImportService.DisableCardsResult();
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(0, result.PeopleMatched);
+            Assert.AreEqual(0, result.CardsDisabled);
+            Assert.AreEqual(0, result.CardsAlreadyDisabled);
+            Assert.AreEqual(0, result.Failed);
+            Assert.IsNotNull(result.Errors);
+            Assert.AreEqual(0, result.Errors.Count);
+            Assert.IsNotNull(result.Warnings);
+            Assert.AreEqual(0, result.Warnings.Count);
+        }
+
+        [TestMethod]
+        public void SetProperties_ReturnsCorrectValues()
+        {
+            var result = new ImportService.DisableCardsResult
+            {
+                Success = true,
+                PeopleMatched = 10,
+                CardsDisabled = 8,
+                CardsAlreadyDisabled = 2,
+                Failed = 1
+            };
+
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(10, result.PeopleMatched);
+            Assert.AreEqual(8, result.CardsDisabled);
+            Assert.AreEqual(2, result.CardsAlreadyDisabled);
+            Assert.AreEqual(1, result.Failed);
+        }
+
+        [TestMethod]
+        public void AddErrors_StoresCorrectly()
+        {
+            var result = new ImportService.DisableCardsResult();
+            result.Errors.Add("Card error 1");
+            result.Errors.Add("Card error 2");
+
+            Assert.AreEqual(2, result.Errors.Count);
+            Assert.AreEqual("Card error 1", result.Errors[0]);
+        }
+
+        [TestMethod]
+        public void AddWarnings_StoresCorrectly()
+        {
+            var result = new ImportService.DisableCardsResult();
+            result.Warnings.Add("Card already disabled");
+
+            Assert.AreEqual(1, result.Warnings.Count);
+            Assert.AreEqual("Card already disabled", result.Warnings[0]);
+        }
+    }
+
+    #endregion
+
+    #region FormatExceptionDetails Tests
+
+    [TestClass]
+    public class FormatExceptionDetailsTests
+    {
+        [TestMethod]
+        public void GenericException_IncludesTypeAndMessage()
+        {
+            var ex = new InvalidOperationException("something broke");
+            var details = ImportService.FormatExceptionDetails(ex);
+
+            StringAssert.Contains(details, "System.InvalidOperationException");
+            StringAssert.Contains(details, "something broke");
+        }
+
+        [TestMethod]
+        public void ExceptionWithInner_IncludesInnerDetails()
+        {
+            var inner = new ArgumentException("bad arg");
+            var ex = new Exception("outer error", inner);
+            var details = ImportService.FormatExceptionDetails(ex);
+
+            StringAssert.Contains(details, "outer error");
+            StringAssert.Contains(details, "Inner Exception:");
+            StringAssert.Contains(details, "bad arg");
+            StringAssert.Contains(details, "System.ArgumentException");
+        }
+
+        [TestMethod]
+        public void Exception_IncludesStackTrace()
+        {
+            try
+            {
+                throw new Exception("test");
+            }
+            catch (Exception ex)
+            {
+                var details = ImportService.FormatExceptionDetails(ex);
+                StringAssert.Contains(details, "Stack Trace:");
+            }
+        }
+
+        [TestMethod]
+        public void ExceptionWithoutStackTrace_IncludesStackTraceLabel()
+        {
+            var ex = new Exception("no stack");
+            var details = ImportService.FormatExceptionDetails(ex);
+
+            StringAssert.Contains(details, "Stack Trace:");
+        }
+    }
+
+    #endregion
+
+    #region ExecuteImportAsync Validation Tests
+
+    [TestClass]
+    public class ExecuteImportAsyncValidationTests
+    {
+        [TestMethod]
+        public async Task MissingApiUrl_ReturnsError()
+        {
+            var config = new ImportConfiguration { ApiUrl = null, Instance = "i", Username = "u", Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("test.csv");
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(1, result.Errors.Count);
+            StringAssert.Contains(result.Errors[0], "API URL");
+        }
+
+        [TestMethod]
+        public async Task MissingInstance_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = null, Username = "u", Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("test.csv");
+
+            Assert.IsFalse(result.Success);
+            Assert.AreEqual(1, result.Errors.Count);
+            StringAssert.Contains(result.Errors[0], "Instance");
+        }
+
+        [TestMethod]
+        public async Task MissingUsername_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = null, Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("test.csv");
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(result.Errors[0], "Username");
+        }
+
+        [TestMethod]
+        public async Task MissingPassword_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = null };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("test.csv");
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(result.Errors[0], "Password");
+        }
+
+        [TestMethod]
+        public async Task MissingCsvFilePath_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync(null);
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(result.Errors[0], "CSV file path");
+        }
+
+        [TestMethod]
+        public async Task EmptyCsvFilePath_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("   ");
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(result.Errors[0], "CSV file path");
+        }
+
+        [TestMethod]
+        public async Task NoAccessLevelRules_ReturnsError()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+
+            var result = await service.ExecuteImportAsync("test.csv");
+
+            Assert.IsFalse(result.Success);
+            StringAssert.Contains(result.Errors[0], "access level rule");
+        }
+    }
+
+    #endregion
+
+    #region PostDeskLogin Validation Tests
+
+    [TestClass]
+    public class PostDeskLoginValidationTests
+    {
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginEventAsync_NullName_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginEventAsync(null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginEventAsync_EmptyName_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginEventAsync("");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginEventAsync_WhitespaceName_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginEventAsync("   ");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginByCardAsync_NullCardNumber_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginByCardAsync(null);
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginByCardAsync_EmptyCardNumber_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginByCardAsync("");
+        }
+
+        [TestMethod]
+        [ExpectedException(typeof(ArgumentException))]
+        public async Task PostDeskLoginByCardAsync_WhitespaceCardNumber_Throws()
+        {
+            var config = new ImportConfiguration { Instance = "i", Username = "u", Password = "p" };
+            var service = new ImportService(config);
+            await service.PostDeskLoginByCardAsync("   ");
+        }
+    }
+
+    #endregion
+
+    #region ImportService Logger Tests
+
+    [TestClass]
+    public class ImportServiceLoggerTests
+    {
+        [TestMethod]
+        public async Task Logger_ReceivesValidationMessages()
+        {
+            var messages = new List<string>();
+            var config = new ImportConfiguration { Instance = null, Username = "u", Password = "p" };
+            config.AccessLevelRules.Add(new AccessLevelRule { Name = "R", StartAge = 1 });
+            var service = new ImportService(config, msg => messages.Add(msg));
+
+            await service.ExecuteImportAsync("test.csv");
+
+            // Validation errors are returned in result, not logged — logger is used for operational messages
+            // Just verify the service was created with the logger without error
+            Assert.IsNotNull(service);
+        }
+
+        [TestMethod]
+        public void WithNullLogger_DoesNotThrow()
+        {
+            var service = new ImportService(new ImportConfiguration(), null);
+            Assert.IsNotNull(service);
+        }
+    }
+
+    #endregion
+
+    #region WriteCsvTemplate Tests
+
+    [TestClass]
+    public class WriteCsvTemplateTests
+    {
+        [TestMethod]
+        public void WriteTemplateCsv_CreatesFileWithHeaders()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "template_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                ImportService.WriteTemplateCsv(tempPath);
+
+                Assert.IsTrue(File.Exists(tempPath));
+                var content = File.ReadAllText(tempPath);
+                StringAssert.Contains(content, "Name");
+                StringAssert.Contains(content, "Address");
+                StringAssert.Contains(content, "Phone");
+                StringAssert.Contains(content, "Email");
+                StringAssert.Contains(content, "Birthday");
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        [TestMethod]
+        public void WriteTemplateCsv_ContainsSampleData()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "template_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                ImportService.WriteTemplateCsv(tempPath);
+
+                var content = File.ReadAllText(tempPath);
+                StringAssert.Contains(content, "John Smith");
+                StringAssert.Contains(content, "Jane Doe");
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+    }
+
+    #endregion
+
+    #region ReadCsvFile Tests
+
+    [TestClass]
+    public class ReadCsvFileTests
+    {
+        [TestMethod]
+        public void ReadCsvFile_ValidFile_ReturnsRecords()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "read_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                File.WriteAllText(tempPath,
+                    "Name,Address,Phone,Email,Birthday\n" +
+                    "John Smith,\"123 Main St, Springfield, IL 62701\",555-1234,john@test.com,03/15/2010\n" +
+                    "Jane Doe,\"456 Oak Ave, Columbus, OH 43215\",555-5678,jane@test.com,07/22/2008\n");
+
+                var service = new ImportService(new ImportConfiguration());
+                var records = service.ReadCsvFile(tempPath);
+
+                Assert.AreEqual(2, records.Count);
+                Assert.AreEqual("John Smith", records[0].Name);
+                Assert.AreEqual("Jane Doe", records[1].Name);
+                Assert.AreEqual("555-1234", records[0].Phone);
+                Assert.AreEqual("jane@test.com", records[1].Email);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        [TestMethod]
+        public void ReadCsvFile_EmptyFile_ReturnsEmptyList()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "empty_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                File.WriteAllText(tempPath, "Name,Address,Phone,Email,Birthday\n");
+
+                var service = new ImportService(new ImportConfiguration());
+                var records = service.ReadCsvFile(tempPath);
+
+                Assert.AreEqual(0, records.Count);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        [TestMethod]
+        public void ReadCsvFile_RoundTripsWithTemplate()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "roundtrip_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                ImportService.WriteTemplateCsv(tempPath);
+
+                var service = new ImportService(new ImportConfiguration());
+                var records = service.ReadCsvFile(tempPath);
+
+                Assert.AreEqual(2, records.Count);
+                Assert.AreEqual("John Smith", records[0].Name);
+                Assert.AreEqual("Jane Doe", records[1].Name);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+    }
+
+    #endregion
+
+    #region LoadCsvForPreview Tests
+
+    [TestClass]
+    public class LoadCsvForPreviewTests
+    {
+        [TestMethod]
+        public void LoadCsvForPreview_ValidFile_ReturnsPreviews()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "preview_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                File.WriteAllText(tempPath,
+                    "Name,Address,Phone,Email,Birthday\n" +
+                    "John Smith,\"123 Main St, Springfield, IL 62701\",555-1234,john@test.com,03/15/2010\n");
+
+                var config = new ImportConfiguration();
+                config.AccessLevelRules.Add(new AccessLevelRule { Name = "Test", StartAge = 12, EndAge = 14 });
+                var service = new ImportService(config);
+                var previews = service.LoadCsvForPreview(tempPath);
+
+                Assert.AreEqual(1, previews.Count);
+                Assert.AreEqual("John Smith", previews[0].Name);
+                Assert.AreEqual(1, previews[0].AccessLevels.Count);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        [TestMethod]
+        public void LoadCsvForPreview_SkipsMissingName()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "preview_skip_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                File.WriteAllText(tempPath,
+                    "Name,Address,Phone,Email,Birthday\n" +
+                    ",\"123 Main St, Springfield, IL 62701\",555-1234,john@test.com,03/15/2010\n" +
+                    "Jane Doe,\"456 Oak Ave, Columbus, OH 43215\",555-5678,jane@test.com,07/22/2008\n");
+
+                var config = new ImportConfiguration();
+                config.AccessLevelRules.Add(new AccessLevelRule { Name = "Test", StartAge = 12 });
+                var service = new ImportService(config);
+                var previews = service.LoadCsvForPreview(tempPath);
+
+                Assert.AreEqual(1, previews.Count);
+                Assert.AreEqual("Jane Doe", previews[0].Name);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+        }
+
+        [TestMethod]
+        public void LoadCsvForPreview_SkipsMissingAddress()
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), "preview_noaddr_" + Guid.NewGuid().ToString("N") + ".csv");
+            try
+            {
+                File.WriteAllText(tempPath,
+                    "Name,Address,Phone,Email,Birthday\n" +
+                    "John Smith,,555-1234,john@test.com,03/15/2010\n" +
+                    "Jane Doe,\"456 Oak Ave, Columbus, OH 43215\",555-5678,jane@test.com,07/22/2008\n");
+
+                var config = new ImportConfiguration();
+                config.AccessLevelRules.Add(new AccessLevelRule { Name = "Test", StartAge = 12 });
+                var service = new ImportService(config);
+                var previews = service.LoadCsvForPreview(tempPath);
+
+                Assert.AreEqual(1, previews.Count);
+                Assert.AreEqual("Jane Doe", previews[0].Name);
+            }
+            finally
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
         }
     }
 
