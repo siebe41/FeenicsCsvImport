@@ -33,9 +33,10 @@ The application connects to the Feenics Keep API, creates person records, and as
 
 | Project | Description |
 |---|---|
-| **FeenicsCsvImport.Gui** | WPF desktop application (main entry point) |
-| **FeenicsCsvImport.ClassLibrary** | Core logic — CSV parsing, API interaction, access level scheduling |
+| **FeenicsCsvImport.Gui** | WPF desktop application (main entry point for CSV import) |
+| **FeenicsCsvImport.ClassLibrary** | Core logic — CSV parsing, API interaction, access level scheduling, desk login |
 | **FeenicsCsvImport** | Console application for headless/scripted imports |
+| **FeenicsCardSwipeMonitor** | System-tray badge listener — reads card scans and posts DESK LOGIN notes to Feenics |
 | **FeenicsCsvImport.Test** | Unit tests (MSTest) |
 
 ## Requirements

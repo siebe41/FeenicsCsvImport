@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using Feenics.Keep.WebApi.Wrapper;
 using FeenicsCsvImport.ClassLibrary;
 
@@ -14,6 +16,14 @@ namespace FeenicsCardSwipeMonitor
         public SettingsWindow()
         {
             InitializeComponent();
+
+            // Apply the same Shield icon used by the system tray
+            var icon = System.Drawing.SystemIcons.Shield;
+            Icon = Imaging.CreateBitmapSourceFromHIcon(
+                icon.Handle,
+                Int32Rect.Empty,
+                BitmapSizeOptions.FromEmptyOptions());
+
             // Load existing non-sensitive settings
             TxtInstance.Text = Properties.Settings.Default.InstanceName;
             TxtUser.Text = Properties.Settings.Default.ApiUsername;
