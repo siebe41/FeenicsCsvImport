@@ -29,18 +29,21 @@ jobs:
         dotnet-version: '6.0.x' 
        
     - name: Setup NuGet Config
+      shell: bash
       run: |
-        $config = @"
+        cat <<EOF > nuget.config
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
           <packageSources>
             <clear />
-            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-            <add key="Feenics" value="https://nuget-secure.feenics.com/nuget" allowInsecureConnections="true" />
+            <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+            <add key="Feenics" value="http://nuget-secure.feenics.com/nuget" allowInsecureConnections="true" />
           </packageSources>
         </configuration>
-        "@
-        Set-Content -Path nuget.config -Value $config
+        EOF
+
+    - name: Explicit Restore
+      run: dotnet restore
 
     - name: Publish Monitor App
       # GitVersionTask will automatically pick up the version during this step
