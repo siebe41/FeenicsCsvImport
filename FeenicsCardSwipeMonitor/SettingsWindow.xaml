@@ -1,7 +1,7 @@
-<Window x:Class="FeenicsCardSwipeMonitor.SettingsWindow"
+﻿<Window x:Class="FeenicsCardSwipeMonitor.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Feenics Configuration" Height="500" Width="450" 
+        Title="Badge Reader Configuration" Height="600" Width="450" 
         WindowStartupLocation="CenterScreen" Background="#F0F0F0" ResizeMode="NoResize">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -29,10 +29,11 @@
 
                 <Separator Margin="0,5,0,15"/>
 
-                <Label Content="Reader COM Port (e.g., COM3)" FontWeight="Medium"/>
+                <Label Content="Reader COM Port" FontWeight="Medium"/>
                 <StackPanel Orientation="Horizontal">
-                    <TextBox x:Name="TxtCom" Width="100" Padding="5" VerticalContentAlignment="Center"/>
-                    <TextBlock Text="Check Device Manager if unsure." Margin="10,0,0,0" VerticalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#888"/>
+                    <ComboBox x:Name="CmbCom" Width="100" Padding="5" VerticalContentAlignment="Center" IsEditable="True"/>
+                    <Button x:Name="BtnRefreshPorts" Content="↻" Width="28" Height="28" Margin="5,0,0,0" Click="BtnRefreshPorts_Click" ToolTip="Refresh Ports" Background="#E1E1E1"/>
+                    <TextBlock Text="Select or type port (e.g. COM3)." Margin="10,0,0,0" VerticalAlignment="Center" FontSize="11" FontStyle="Italic" Foreground="#888"/>
                 </StackPanel>
 
                 <Separator Margin="0,15,0,10"/>

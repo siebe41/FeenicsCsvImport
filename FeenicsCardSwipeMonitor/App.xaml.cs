@@ -73,12 +73,25 @@ namespace FeenicsCardSwipeMonitor
                     Dispatcher.Invoke(() => Clipboard.SetText(badge));
 
                     // B. Call your library method
-                    // (Assuming you've added the PostDeskLoginByCardAsync logic to ImportService)
                     await _importService.PostDeskLoginByCardAsync(badge);
                 };
+
                 _serialPort.Open();
             }
-            catch { /* Handle Port Error */ }
+            catch (UnauthorizedAccessException)
+            {
+                MessageBox.Show($"Access denied to {port}. Please ensure the rf IDEAS utility is closed and no other programs are using the reader.",
+                                "Port In Use",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open port {port}: {ex.Message}",
+                                "Connection Error",
+                                MessageBoxButton.OK,
+                                MessageBoxImage.Error);
+            }
         }
 
         private void Notify(string message)

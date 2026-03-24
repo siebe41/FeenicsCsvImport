@@ -45,7 +45,6 @@
     <Compile Include="AddressNormalizer.cs" />
     <Compile Include="DuplicateHandling.cs" />
     <Compile Include="SavedSettings.cs" />
-    <Compile Include="Class1.cs" />
     <Compile Include="ImportConfiguration.cs" />
     <Compile Include="ImportPreviewModel.cs" />
     <Compile Include="ImportService.cs" />

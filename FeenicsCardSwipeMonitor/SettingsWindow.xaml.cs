@@ -27,7 +27,42 @@ namespace FeenicsCardSwipeMonitor
             // Load existing non-sensitive settings
             TxtInstance.Text = Properties.Settings.Default.InstanceName;
             TxtUser.Text = Properties.Settings.Default.ApiUsername;
-            TxtCom.Text = Properties.Settings.Default.ComPort;
+
+            // Load COM Ports
+            LoadComPorts();
+        }
+
+        private void LoadComPorts()
+        {
+            string savedPort = Properties.Settings.Default.ComPort;
+            CmbCom.Items.Clear();
+
+            // Grab all active COM ports from Windows
+            string[] ports = SerialPort.GetPortNames();
+            foreach (string port in ports)
+            {
+                CmbCom.Items.Add(port);
+            }
+
+            // Select the saved port if it exists. If it's a new port not in the list, add it anyway.
+            if (!string.IsNullOrEmpty(savedPort))
+            {
+                if (!CmbCom.Items.Contains(savedPort))
+                {
+                    CmbCom.Items.Add(savedPort);
+                }
+                CmbCom.SelectedItem = savedPort;
+            }
+            else if (CmbCom.Items.Count > 0)
+            {
+                CmbCom.SelectedIndex = 0; // Default to the first found port
+            }
+        }
+
+        private void BtnRefreshPorts_Click(object sender, RoutedEventArgs e)
+        {
+            LoadComPorts();
+            TxtStatus.Text = "Port list refreshed.";
         }
 
         private async void BtnTest_Click(object sender, RoutedEventArgs e)
@@ -82,7 +117,7 @@ namespace FeenicsCardSwipeMonitor
             }
 
             // --- Test COM Port ---
-            string comPort = TxtCom.Text.Trim();
+            string comPort = CmbCom.Text.Trim(); // Read from ComboBox instead of TextBox
             if (string.IsNullOrWhiteSpace(comPort))
             {
                 status.AppendLine("COM: Skipped — no port specified.");
@@ -97,6 +132,10 @@ namespace FeenicsCardSwipeMonitor
                         status.AppendLine($"COM: OK — {comPort} opened successfully.");
                         sp.Close();
                     }
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    status.AppendLine($"COM: FAILED — {comPort} is in use by another program (or the configuration utility).");
                 }
                 catch (Exception ex)
                 {
@@ -175,15 +214,18 @@ namespace FeenicsCardSwipeMonitor
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            // Encrypt password
-            byte[] clearBytes = Encoding.UTF8.GetBytes(TxtPass.Password);
-            byte[] encryptedBytes = ProtectedData.Protect(clearBytes, null, DataProtectionScope.CurrentUser);
+            // Encrypt password only if a new one was typed
+            if (!string.IsNullOrEmpty(TxtPass.Password))
+            {
+                byte[] clearBytes = Encoding.UTF8.GetBytes(TxtPass.Password);
+                byte[] encryptedBytes = ProtectedData.Protect(clearBytes, null, DataProtectionScope.CurrentUser);
+                Properties.Settings.Default.EncryptedPassword = Convert.ToBase64String(encryptedBytes);
+            }
 
             // Save to App Settings
             Properties.Settings.Default.InstanceName = TxtInstance.Text;
             Properties.Settings.Default.ApiUsername = TxtUser.Text;
-            Properties.Settings.Default.EncryptedPassword = Convert.ToBase64String(encryptedBytes);
-            Properties.Settings.Default.ComPort = TxtCom.Text;
+            Properties.Settings.Default.ComPort = CmbCom.Text; // Read from ComboBox
             Properties.Settings.Default.Save();
 
             this.Close();
