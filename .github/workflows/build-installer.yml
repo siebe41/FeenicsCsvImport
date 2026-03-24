@@ -28,8 +28,19 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
        
-    - name: Add Feenics NuGet Source
-      run: dotnet nuget add source https://nuget-secure.feenics.com/nuget -n Feenics --allow-insecure-connections
+    - name: Setup NuGet Config
+      run: |
+        $config = @"
+        <?xml version=""1.0"" encoding=""utf-8""?>
+        <configuration>
+          <packageSources>
+            <clear />
+            <add key=""nuget.org"" value=""https://api.nuget.org/v3/index.json"" />
+            <add key=""Feenics"" value=""https://nuget-secure.feenics.com/nuget"" allowInsecureConnections=""true"" />
+          </packageSources>
+        </configuration>
+        "@
+        Set-Content -Path nuget.config -Value $config
 
     - name: Publish Monitor App
       # GitVersionTask will automatically pick up the version during this step
