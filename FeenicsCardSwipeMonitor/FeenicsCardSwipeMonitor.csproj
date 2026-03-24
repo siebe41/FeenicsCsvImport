@@ -35,6 +35,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
+	<OutputType>WinExe</OutputType>
+	<TargetFramework>net48</TargetFramework>
     <ApplicationIcon>Images\cardswipeicon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
