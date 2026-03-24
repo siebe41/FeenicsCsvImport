@@ -3,7 +3,7 @@ name: Sync Docs to Wiki
 on:
   push:
     branches:
-      - main # Change this to 'master' if that is your default branch
+      - master # Change this to 'master' if that is your default branch
     paths:
       - 'docs/**' # Only trigger when files in the docs folder change
 

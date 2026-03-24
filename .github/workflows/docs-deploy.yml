@@ -2,7 +2,7 @@ name: Deploy MkDocs Site
 on:
   push:
     branches:
-      - main # Or master, depending on your default branch
+      - master # Or master, depending on your default branch
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
