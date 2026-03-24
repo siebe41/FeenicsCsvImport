@@ -28,7 +28,7 @@ jobs:
       uses: microsoft/setup-msbuild@v2
 
     - name: Setup NuGet
-      uses: NuGet/setup-nuget@v3
+      uses: NuGet/setup-nuget@v2
 
     # Ensure the Feenics feed is available for the restore
     - name: Configure Feenics NuGet Source
