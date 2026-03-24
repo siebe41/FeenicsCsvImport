@@ -28,21 +28,24 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v2.0.0
-
-    - name: Configure Feenics Source
+    # 1. We're going to use a direct NuGet.config approach instead of the CLI add-source
+    - name: Create NuGet Config
       run: |
-        dotnet new nugetconfig --force
-        dotnet nuget add source http://nuget-secure.feenics.com/nuget -n Feenics --allow-insecure-connections
+        echo "<?xml version='1.0' encoding='utf-8'?>
+        <configuration>
+          <packageSources>
+            <add key='nuget.org' value='https://api.nuget.org/v3/index.json' protocolVersion='3' />
+            <add key='Feenics' value='http://nuget-secure.feenics.com/nuget' />
+          </packageSources>
+        </configuration>" > nuget.config
 
-    # Force a clean restore on the whole solution
+    # 2. Restore using the explicit config file and allowing insecure connections
     - name: Restore Dependencies
-      run: dotnet restore --force --no-cache
+      run: dotnet restore --configfile nuget.config
 
-    # Explicitly build the Class Library first since both apps depend on it
-    - name: Build Class Library
-      run: dotnet build FeenicsCsvImport.ClassLibrary/FeenicsCsvImport.ClassLibrary.csproj -c Release
+    # 3. Build everything in one go at the solution level
+    - name: Build Solution
+      run: dotnet build -c Release --no-restore
 
     - name: Publish Monitor App
       run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release -o publish/Monitor --no-restore
