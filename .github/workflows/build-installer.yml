@@ -18,7 +18,7 @@ jobs:
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v3.0.0
       with:
-        includePrerelease: true # Added this just in case you use beta tags
+        versionSpec: '5.x' # Force it to use a compatible 5.x version
 
     - name: Execute GitVersion
       id: gitversion
