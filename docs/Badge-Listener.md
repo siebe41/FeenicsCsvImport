@@ -20,8 +20,8 @@ It is designed for front-desk workflows where staff need to log member check-ins
 
 Each scan produces a note on the person's profile in the format:
 
-```
-***DESK LOGIN*** — 2025-01-15 14:30:22
+```text
+***DESK LOGIN*** - 2025-01-15 14:30:22
 ```
 
 Only one DESK LOGIN note exists per person at any time. Each new scan replaces the previous note, so the profile always shows the most recent check-in.
@@ -32,7 +32,7 @@ Only one DESK LOGIN note exists per person at any time. Each new scan replaces t
 
 1. Run `FeenicsCardSwipeMonitor.exe`
 2. The Shield icon appears in the system tray
-3. Right-click the icon ? **Settings**
+3. Right-click the icon -> **Settings**
 
 ### Settings Window
 
@@ -43,12 +43,12 @@ Only one DESK LOGIN note exists per person at any time. Each new scan replaces t
 | **API Password** | Feenics login password |
 | **COM Port** | Serial port for the card reader (e.g., `COM3`) |
 
-Click **Save & Encrypt** to persist settings. The password is encrypted using Windows DPAPI (`ProtectedData.Protect` with `DataProtectionScope.CurrentUser`) — it can only be decrypted by the same Windows user on the same machine.
+Click **Save & Encrypt** to persist settings. The password is encrypted using Windows DPAPI (`ProtectedData.Protect` with `DataProtectionScope.CurrentUser`) - it can only be decrypted by the same Windows user on the same machine.
 
 ### Finding the COM Port
 
 1. Connect the card reader via USB
-2. Open **Device Manager** ? expand **Ports (COM & LPT)**
+2. Open **Device Manager** -> expand **Ports (COM & LPT)**
 3. Note the COM port number (e.g., `COM3`)
 4. Enter it in the Settings window
 
@@ -63,9 +63,9 @@ Click the **Test Connection** button in the Settings window to verify both conne
 
 Results appear in the status area:
 
-```
-API: OK — connected to "OaksLanding".
-COM: OK — COM3 opened successfully.
+```text
+API: OK - connected to "OaksLanding".
+COM: OK - COM3 opened successfully.
 ```
 
 ### Simulate Scan
@@ -99,8 +99,8 @@ These match the default settings for most USB HID badge readers operating in ser
 
 When a badge is scanned, the cardholder is found using a two-step lookup:
 
-1. **Direct lookup** — `GetPersonByActiveCardAsync` queries the Feenics API by card number (fast, single API call)
-2. **Fallback search** — if the direct lookup fails, all people are paginated and their `CardAssignments` are checked for a matching `DisplayCardNumber` or `EncodedCardNumber`
+1. **Direct lookup** - `GetPersonByActiveCardAsync` queries the Feenics API by card number (fast, single API call)
+2. **Fallback search** - if the direct lookup fails, all people are paginated and their `CardAssignments` are checked for a matching `DisplayCardNumber` or `EncodedCardNumber`
 
 The scanned value must match an **active** card assignment in the Feenics instance.
 
@@ -130,8 +130,8 @@ The badge listener is a WPF application with no main window (`ShutdownMode="OnEx
 
 | File | Purpose |
 |---|---|
-| `App.xaml.cs` | Entry point — creates tray icon, initializes `ImportService`, opens serial port |
-| `SettingsWindow.xaml` / `.cs` | Configuration UI — credentials, COM port, test connection, simulate scan |
+| `App.xaml.cs` | Entry point - creates tray icon, initializes `ImportService`, opens serial port |
+| `SettingsWindow.xaml` / `.cs` | Configuration UI - credentials, COM port, test connection, simulate scan |
 | `Properties\Settings.settings` | Persisted user settings (instance, username, encrypted password, COM port) |
 
 It depends on the shared **FeenicsCsvImport.ClassLibrary** project for all Feenics API interaction via `ImportService`.
@@ -142,8 +142,8 @@ It depends on the shared **FeenicsCsvImport.ClassLibrary** project for all Feeni
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `COM: FAILED — The port 'COMx' does not exist` | Wrong port number | Check Device Manager for the correct port |
-| `COM: FAILED — Access to the port is denied` | Another application has the port open | Close other serial terminal apps or badge software |
+| `COM: FAILED - The port 'COMx' does not exist` | Wrong port number | Check Device Manager for the correct port |
+| `COM: FAILED - Access to the port is denied` | Another application has the port open | Close other serial terminal apps or badge software |
 | Reader works briefly then stops | USB power management | Disable USB selective suspend in Power Options |
 
 ### API errors
