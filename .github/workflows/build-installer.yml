@@ -14,6 +14,7 @@ jobs:
       with:
         fetch-depth: 0 
 
+    # 1. Install GitVersion (Pinned to 6.0.x for v6 config support)
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v3.1.11
       with:
@@ -28,7 +29,7 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
-    # 1. We're going to use a direct NuGet.config approach instead of the CLI add-source
+    # 2. Manually create the NuGet.config with the explicit 'allowInsecureConnections' flag
     - name: Create NuGet Config
       run: |
         echo "<?xml version='1.0' encoding='utf-8'?>
@@ -37,25 +38,31 @@ jobs:
             <add key='nuget.org' value='https://api.nuget.org/v3/index.json' protocolVersion='3' />
             <add key='Feenics' value='http://nuget-secure.feenics.com/nuget' />
           </packageSources>
+          <config>
+            <add key='allowInsecureConnections' value='true' />
+          </config>
         </configuration>" > nuget.config
 
-    # 2. Restore using the explicit config file and allowing insecure connections
+    # 3. Restore using the explicit config file
     - name: Restore Dependencies
       run: dotnet restore --configfile nuget.config
 
-    # 3. Build everything in one go at the solution level
+    # 4. Build the solution to ensure the Class Library and Apps are compiled
     - name: Build Solution
       run: dotnet build -c Release --no-restore
 
+    # 5. Publish to specific folders for the Installer to grab
     - name: Publish Monitor App
       run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release -o publish/Monitor --no-restore
 
     - name: Publish Import Tool
       run: dotnet publish FeenicsCsvImport/FeenicsCsvImport.csproj -c Release -o publish/ImportTool --no-restore
       
+    # 6. Build the installer passing the SemVer from GitVersion
     - name: Compile Inno Setup Installer
       run: iscc /DMyAppVersion="${{ steps.gitversion.outputs.semVer }}" installer.iss
 
+    # 7. Upload the setup file to the GitHub Release
     - name: Upload Installer to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
