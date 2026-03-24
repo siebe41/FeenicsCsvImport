@@ -1,0 +1,60 @@
+name: Sync Docs to Wiki
+
+on:
+  push:
+    branches:
+      - main # Change this to 'master' if that is your default branch
+    paths:
+      - 'docs/**' # Only trigger when files in the docs folder change
+
+jobs:
+  update-wiki:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push to the wiki repository
+
+    steps:
+      - name: Checkout Main Repository
+        uses: actions/checkout@v4
+        with:
+          path: main-repo
+
+      - name: Checkout Wiki Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki-repo
+
+      - name: Process and Sync Files
+        run: |
+          # Copy all markdown files from the docs folder to the wiki folder
+          cp main-repo/docs/*.md wiki-repo/
+          
+          cd wiki-repo
+
+          # Strip the Jekyll YAML Front Matter from the top of the files
+          # This specifically targets the first --- block to avoid deleting horizontal rules (---) later in your text
+          for file in *.md; do
+            awk 'NR==1 && /^---$/ { in_fm=1; next } in_fm && /^---$/ { in_fm=0; next } !in_fm { print }' "$file" > tmp && mv tmp "$file"
+          done
+
+          # GitHub Pages uses index.md, but the Wiki requires Home.md for its landing page
+          if [ -f "index.md" ]; then
+            mv index.md Home.md
+          fi
+
+      - name: Commit and Push to Wiki
+        run: |
+          cd wiki-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          
+          # Only commit and push if there are actually changes
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "Auto-sync docs to wiki"
+            git push
+          else
+            echo "No changes to commit to the wiki."
+          fi
