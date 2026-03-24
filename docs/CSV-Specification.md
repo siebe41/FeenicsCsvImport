@@ -1,9 +1,3 @@
----
-layout: default
-title: CSV Specification
-nav_order: 4
----
-
 # CSV Specification
 
 ## File Format

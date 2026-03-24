@@ -1,9 +1,3 @@
----
-layout: default
-title: Access Level Rules
-nav_order: 5
----
-
 # Access Level Rules
 
 ## Overview

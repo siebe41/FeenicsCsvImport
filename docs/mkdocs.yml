@@ -1,0 +1,20 @@
+site_name: Feenics CSV Import
+site_description: Bulk-import people from CSV into Feenics with age-based scheduled access levels
+repo_url: https://github.com/siebe41/FeenicsCsvImport # Adds a nice GitHub link in the header
+
+theme:
+  name: material
+  palette:
+    scheme: slate # Gives you a sleek dark mode by default
+  features:
+    - navigation.sections # Groups sidebar items nicely
+    - toc.integrate # Puts the page table of contents in the left sidebar
+
+# Here is your entire navigation menu!
+nav:
+  - Home: index.md
+  - User Guide: User-Guide.md
+  - Badge Listener: Badge-Listener.md
+  - CSV Specification: CSV-Specification.md
+  - Access Level Rules: Access-Level-Rules.md
+  - Troubleshooting: Troubleshooting.md
