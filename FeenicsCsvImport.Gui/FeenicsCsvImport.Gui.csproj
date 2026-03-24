@@ -63,8 +63,6 @@
     <SignManifests>true</SignManifests>
   </PropertyGroup>
   <PropertyGroup>
-	<OutputType>WinExe</OutputType>
-	<TargetFramework>net48</TargetFramework>
     <ApplicationIcon>Images\mainicon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
