@@ -14,13 +14,12 @@ jobs:
       with:
         fetch-depth: 0 
 
-# 1. Install GitVersion (Upgraded to v3.1.11 to support v6 tool)
+    # 1. Install GitVersion (Pinned to 6.0.x to support your v6 config and bypass the Action limits)
     - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v3.1.11 
+      uses: gittools/actions/gitversion/setup@v3.1.11
       with:
-        versionSpec: '6.0.x' # Now you can safely use version 6!
+        versionSpec: '6.0.x'
 
-    # 2. Execute GitVersion (Must match the setup version)
     - name: Execute GitVersion
       id: gitversion
       uses: gittools/actions/gitversion/execute@v3.1.11
@@ -30,27 +29,32 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
-    # 2. Install NuGet tool (Using v2 to avoid the @v3 error)
+    # 2. Setup NuGet (Using v2 to avoid the @v3 missing version error)
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2.0.0
 
+    # 3. Configure the insecure Feenics feed
     - name: Configure Feenics Source
       run: |
         dotnet new nugetconfig --force
         dotnet nuget add source http://nuget-secure.feenics.com/nuget -n Feenics --allow-insecure-connections
 
+    # 4. Use dotnet restore so the modern .NET SDK can build the dependency tree
     - name: Restore Packages
-      run: nuget restore
+      run: dotnet restore
 
+    # 5. Publish using the .NET CLI without the --no-restore flag
     - name: Publish Monitor App
-      run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release --no-restore -o publish/Monitor
+      run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release -o publish/Monitor
 
     - name: Publish Import Tool
-      run: dotnet publish FeenicsCsvImport/FeenicsCsvImport.csproj -c Release --no-restore -o publish/ImportTool
+      run: dotnet publish FeenicsCsvImport/FeenicsCsvImport.csproj -c Release -o publish/ImportTool
       
+    # 6. Build the installer passing the dynamic version
     - name: Compile Inno Setup Installer
       run: iscc /DMyAppVersion="${{ steps.gitversion.outputs.semVer }}" installer.iss
 
+    # 7. Upload to the GitHub Release page
     - name: Upload Installer to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
