@@ -18,7 +18,7 @@ jobs:
     - name: Install GitVersion
       uses: gittools/actions/gitversion/setup@v3.1.11 
       with:
-        versionSpec: '6.x' # Now you can safely use version 6!
+        versionSpec: '6.0.x' # Now you can safely use version 6!
 
     # 2. Execute GitVersion (Must match the setup version)
     - name: Execute GitVersion
