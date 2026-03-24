@@ -28,7 +28,6 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
-    # 1. Create the NuGet.config using PowerShell "Here-String" syntax
     - name: Create NuGet Config
       shell: pwsh
       run: |
@@ -43,26 +42,24 @@ jobs:
         "@
         $config | Out-File -FilePath nuget.config -Encoding utf8
 
-    # 2. Restore using the explicit config file
-    - name: Restore Dependencies
-      run: dotnet restore --configfile nuget.config
+    # 1. Clean previous artifacts to prevent "ghost" errors
+    - name: Clean Solution
+      run: dotnet clean -c Release
 
-    # 3. Build the solution
+    # 2. Restore and Build in a single unified step (removed --no-restore)
     - name: Build Solution
-      run: dotnet build -c Release --no-restore
+      run: dotnet build -c Release --configfile nuget.config
 
-    # 4. Publish to specific folders
+    # 3. Explicitly Publish
     - name: Publish Monitor App
       run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release -o publish/Monitor --no-restore
 
     - name: Publish Import Tool
       run: dotnet publish FeenicsCsvImport/FeenicsCsvImport.csproj -c Release -o publish/ImportTool --no-restore
       
-    # 5. Build the installer
     - name: Compile Inno Setup Installer
       run: iscc /DMyAppVersion="${{ steps.gitversion.outputs.semVer }}" installer.iss
 
-    # 6. Upload the setup file
     - name: Upload Installer to GitHub Release
       uses: softprops/action-gh-release@v2
       with:
