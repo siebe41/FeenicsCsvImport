@@ -14,11 +14,11 @@ jobs:
       with:
         fetch-depth: 0 
 
-    # 1. Install the official NuGet tool
-    - name: Setup NuGet
-      uses: NuGet/setup-nuget@v2.0.0 # Change from v3 to v2
+    # 1. Install GitVersion correctly
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v3.0.0
       with:
-        gitversionSpec: '6.0.x' # Note: Property name is usually gitversionSpec in v3
+        includePrerelease: true # Added this just in case you use beta tags
 
     - name: Execute GitVersion
       id: gitversion
@@ -29,8 +29,9 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
+    # 2. Install NuGet tool (Using v2 to avoid the @v3 error)
     - name: Setup NuGet
-      uses: NuGet/setup-nuget@v3
+      uses: NuGet/setup-nuget@v2.0.0
 
     - name: Configure Feenics Source
       run: |
