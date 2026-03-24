@@ -1,0 +1,46 @@
+name: Build and Package Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # CRITICAL: GitVersion needs full history to calculate versions
+
+    - name: Install GitVersion
+      uses: gittools/actions/gitversion/setup@v3.0.0
+      with:
+        versionSpec: '6.0.x'
+
+    - name: Execute GitVersion
+      id: gitversion
+      uses: gittools/actions/gitversion/execute@v3.0.0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x' 
+
+    - name: Publish Monitor App
+      # GitVersionTask will automatically pick up the version during this step
+      run: dotnet publish FeenicsCardSwipeMonitor/FeenicsCardSwipeMonitor.csproj -c Release -o publish/Monitor
+
+    - name: Publish Import Tool
+      run: dotnet publish FeenicsCsvImport/FeenicsCsvImport.csproj -c Release -o publish/ImportTool
+
+    - name: Compile Inno Setup Installer
+      # Pass the Semantic Version from GitVersion into the Inno Setup script
+      run: iscc /DMyAppVersion="${{ steps.gitversion.outputs.semVer }}" installer.iss
+
+    - name: Upload Installer to GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        # Dynamically upload the dynamically named setup file
+        files: Output/FeenicsToolsSetup-${{ steps.gitversion.outputs.semVer }}.exe

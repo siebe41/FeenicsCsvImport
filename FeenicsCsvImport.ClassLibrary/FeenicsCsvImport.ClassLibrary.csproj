@@ -49,6 +49,7 @@
     <Compile Include="ImportPreviewModel.cs" />
     <Compile Include="ImportService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UpdateService.cs" />
     <Compile Include="UserCsvModel.cs" />
   </ItemGroup>
   <ItemGroup>

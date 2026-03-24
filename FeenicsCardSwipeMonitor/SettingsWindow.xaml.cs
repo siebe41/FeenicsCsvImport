@@ -1,7 +1,10 @@
 using System;
 using System.IO.Ports;
+using System.Net.Http;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
@@ -28,8 +31,9 @@ namespace FeenicsCardSwipeMonitor
             TxtInstance.Text = Properties.Settings.Default.InstanceName;
             TxtUser.Text = Properties.Settings.Default.ApiUsername;
 
-            // Load COM Ports
+            // Load COM Ports and Serial Settings
             LoadComPorts();
+            LoadSerialSettings();
         }
 
         private void LoadComPorts()
@@ -57,6 +61,21 @@ namespace FeenicsCardSwipeMonitor
             {
                 CmbCom.SelectedIndex = 0; // Default to the first found port
             }
+        }
+
+        private void LoadSerialSettings()
+        {
+            // Populate dropdown options
+            CmbBaud.ItemsSource = new int[] { 4800, 9600, 19200, 38400, 57600, 115200 };
+            CmbDataBits.ItemsSource = new int[] { 7, 8 };
+            CmbParity.ItemsSource = Enum.GetNames(typeof(Parity));
+            CmbStopBits.ItemsSource = Enum.GetNames(typeof(StopBits));
+
+            // Select saved or default values
+            CmbBaud.SelectedItem = Properties.Settings.Default.BaudRate != 0 ? Properties.Settings.Default.BaudRate : 9600;
+            CmbDataBits.SelectedItem = Properties.Settings.Default.DataBits != 0 ? Properties.Settings.Default.DataBits : 8;
+            CmbParity.SelectedItem = !string.IsNullOrEmpty(Properties.Settings.Default.Parity) ? Properties.Settings.Default.Parity : "None";
+            CmbStopBits.SelectedItem = !string.IsNullOrEmpty(Properties.Settings.Default.StopBits) ? Properties.Settings.Default.StopBits : "One";
         }
 
         private void BtnRefreshPorts_Click(object sender, RoutedEventArgs e)
@@ -126,10 +145,16 @@ namespace FeenicsCardSwipeMonitor
             {
                 try
                 {
-                    using (var sp = new SerialPort(comPort, 9600, Parity.None, 8, StopBits.One))
+                    // Pull parameters from dropdowns
+                    int baud = CmbBaud.SelectedItem != null ? (int)CmbBaud.SelectedItem : 9600;
+                    int dataBits = CmbDataBits.SelectedItem != null ? (int)CmbDataBits.SelectedItem : 8;
+                    Parity parity = CmbParity.SelectedItem != null ? (Parity)Enum.Parse(typeof(Parity), CmbParity.SelectedItem.ToString()) : Parity.None;
+                    StopBits stopBits = CmbStopBits.SelectedItem != null ? (StopBits)Enum.Parse(typeof(StopBits), CmbStopBits.SelectedItem.ToString()) : StopBits.One;
+
+                    using (var sp = new SerialPort(comPort, baud, parity, dataBits, stopBits))
                     {
                         sp.Open();
-                        status.AppendLine($"COM: OK — {comPort} opened successfully.");
+                        status.AppendLine($"COM: OK — {comPort} opened successfully at {baud} baud.");
                         sp.Close();
                     }
                 }
@@ -212,6 +237,40 @@ namespace FeenicsCardSwipeMonitor
             BtnSimulate.IsEnabled = true;
         }
 
+        private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            BtnCheckUpdate.IsEnabled = false;
+            TxtStatus.Text = "Checking GitHub for updates...";
+
+            try
+            {
+                Version currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+
+                // Wrap in a using statement since we only need it briefly for this click
+                using (var updateService = new UpdateService("siebe41", "FeenicsCsvImport", currentVersion))
+                {
+                    var result = await updateService.CheckForUpdatesAsync();
+
+                    if (result.IsUpdateAvailable)
+                    {
+                        TxtStatus.Text = $"Update Available! You are on {currentVersion.ToString(3)}, but {result.LatestVersion} is available.";
+                        // Optional: Automatically open browser
+                        // System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(result.ReleaseUrl) { UseShellExecute = true });
+                    }
+                    else
+                    {
+                        TxtStatus.Text = $"You are up to date! (v{currentVersion.ToString(3)})";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                TxtStatus.Text = $"Error checking for updates: {ex.Message}";
+            }
+
+            BtnCheckUpdate.IsEnabled = true;
+        }
+
         private void BtnSave_Click(object sender, RoutedEventArgs e)
         {
             // Encrypt password only if a new one was typed
@@ -225,7 +284,14 @@ namespace FeenicsCardSwipeMonitor
             // Save to App Settings
             Properties.Settings.Default.InstanceName = TxtInstance.Text;
             Properties.Settings.Default.ApiUsername = TxtUser.Text;
-            Properties.Settings.Default.ComPort = CmbCom.Text; // Read from ComboBox
+            Properties.Settings.Default.ComPort = CmbCom.Text;
+
+            // Save serial settings
+            if (CmbBaud.SelectedItem != null) Properties.Settings.Default.BaudRate = (int)CmbBaud.SelectedItem;
+            if (CmbDataBits.SelectedItem != null) Properties.Settings.Default.DataBits = (int)CmbDataBits.SelectedItem;
+            if (CmbParity.SelectedItem != null) Properties.Settings.Default.Parity = CmbParity.SelectedItem.ToString();
+            if (CmbStopBits.SelectedItem != null) Properties.Settings.Default.StopBits = CmbStopBits.SelectedItem.ToString();
+
             Properties.Settings.Default.Save();
 
             this.Close();

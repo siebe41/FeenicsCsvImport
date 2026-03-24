@@ -16,6 +16,7 @@ namespace FeenicsCsvImport.Gui
         private CancellationTokenSource _cancellationTokenSource;
         private string _selectedFilePath;
         private readonly ObservableCollection<AccessLevelRule> _rules;
+        private UpdateService _updateService;
 
         public MainWindow()
         {
@@ -56,6 +57,56 @@ namespace FeenicsCsvImport.Gui
             dgRules.ItemsSource = _rules;
 
             LogMessage("Settings loaded.");
+            InitializeUpdateChecker();
+        }
+
+        private void InitializeUpdateChecker()
+        {
+            try
+            {
+                Version currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+                _updateService = new UpdateService("siebe41", "FeenicsCsvImport", currentVersion);
+
+                // Subscribe to the background event
+                _updateService.UpdateAvailable += (s, updateInfo) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        // Update UI to show the button and version number
+                        txtUpdateVersion.Text = updateInfo.LatestVersion.ToString(3);
+                        btnUpdateAvailable.Tag = updateInfo.ReleaseUrl; // Store the URL in the button's Tag property
+                        btnUpdateAvailable.Visibility = Visibility.Visible;
+
+                        LogMessage($"*** An update to v{updateInfo.LatestVersion.ToString(3)} is available on GitHub! ***");
+                    });
+                };
+
+                // Start periodic background checks (every 4 hours)
+                _updateService.StartPeriodicCheck(TimeSpan.FromHours(4));
+
+                // Perform an immediate check right now on startup
+                _ = _updateService.CheckForUpdatesAsync();
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"Warning: Could not initialize update checker. {ex.Message}");
+            }
+        }
+
+        private void BtnUpdateAvailable_Click(object sender, RoutedEventArgs e)
+        {
+            // Open the GitHub releases page in the user's default web browser
+            if (btnUpdateAvailable.Tag is string url)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            }
+        }
+
+        // Ensure the background timer is properly disposed of when the app closes
+        protected override void OnClosed(EventArgs e)
+        {
+            _updateService?.Dispose();
+            base.OnClosed(e);
         }
 
         private void BtnSaveSettings_Click(object sender, RoutedEventArgs e)

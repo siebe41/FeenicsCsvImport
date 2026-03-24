@@ -19,11 +19,27 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,15">
-            <Image Source="Images/icon.png" Width="32" Height="32" Margin="0,0,10,0" VerticalAlignment="Center"/>
-            <TextBlock Text="Feenics CSV User Import" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0,0,0,15">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                <Image Source="Images/icon.png" Width="32" Height="32" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <TextBlock Text="Feenics CSV User Import" FontSize="24" FontWeight="Bold" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <Button Grid.Column="1" x:Name="btnUpdateAvailable" Visibility="Collapsed" 
+                    Background="#FF9800" Foreground="White" FontWeight="Bold" Padding="15,5"
+                    Click="BtnUpdateAvailable_Click" VerticalAlignment="Center" Cursor="Hand" BorderThickness="0" ToolTip="Click to download the latest version">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⭐ Update Available (v" />
+                    <TextBlock x:Name="txtUpdateVersion" />
+                    <TextBlock Text=")" />
+                </StackPanel>
+            </Button>
+        </Grid>
 
         <!-- Connection Settings -->
         <GroupBox Grid.Row="1" Header="Connection Settings" Margin="0,0,0,10">
