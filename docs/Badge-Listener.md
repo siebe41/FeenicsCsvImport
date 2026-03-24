@@ -1,3 +1,9 @@
+---
+layout: default
+title: Badge Listener
+nav_order: 3
+---
+
 # Badge Listener
 
 ## Overview

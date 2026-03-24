@@ -1,3 +1,9 @@
+---
+layout: default
+title: Home
+nav_order: 1
+---
+
 # Feenics CSV Import — Wiki
 
 Welcome to the Feenics CSV Import wiki. This tool suite includes a bulk CSV importer for the Feenics (Acre Security) cloud access control platform and a badge listener for front-desk check-in workflows.
