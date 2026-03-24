@@ -28,10 +28,11 @@ jobs:
       with:
         dotnet-version: '6.0.x' 
 
-    # 1. Create the NuGet.config using a more reliable multi-line format
+    # 1. Create the NuGet.config using PowerShell "Here-String" syntax
     - name: Create NuGet Config
+      shell: pwsh
       run: |
-        cat <<EOF > nuget.config
+        $config = @"
         <?xml version="1.0" encoding="utf-8"?>
         <configuration>
           <packageSources>
@@ -39,7 +40,8 @@ jobs:
             <add key="Feenics" value="http://nuget-secure.feenics.com/nuget" allowInsecureConnections="true" />
           </packageSources>
         </configuration>
-        EOF
+        "@
+        $config | Out-File -FilePath nuget.config -Encoding utf8
 
     # 2. Restore using the explicit config file
     - name: Restore Dependencies
