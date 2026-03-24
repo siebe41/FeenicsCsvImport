@@ -14,8 +14,9 @@ jobs:
       with:
         fetch-depth: 0 
 
-    - name: Install GitVersion
-      uses: gittools/actions/gitversion/setup@v3.0.0
+    # 1. Install the official NuGet tool
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2.0.0 # Change from v3 to v2
       with:
         gitversionSpec: '6.0.x' # Note: Property name is usually gitversionSpec in v3
 
