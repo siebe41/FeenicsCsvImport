@@ -20,12 +20,12 @@ Name: "import"; Description: "Feenics CSV Import Tool"; Types: custom
 
 [Files]
 ; Monitor App
-Source: "FeenicsCardSwipeMonitor\bin\x64\Release\FeenicsCardSwipeMonitor.exe"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion
-Source: "FeenicsCardSwipeMonitor\bin\x64\Release\*"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "FeenicsCardSwipeMonitor\bin\Release\FeenicsCardSwipeMonitor.exe"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion
+Source: "FeenicsCardSwipeMonitor\bin\Release\*"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; Import Tool - Updated to match your Workflow's Gui project folder
-Source: "FeenicsCsvImport.Gui\bin\x64\Release\FeenicsCsvImport.Gui.exe"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion
-Source: "FeenicsCsvImport.Gui\bin\x64\Release\*"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "FeenicsCsvImport.Gui\bin\Release\FeenicsCsvImport.Gui.exe"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion
+Source: "FeenicsCsvImport.Gui\bin\Release\*"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Card Swipe Monitor"; Filename: "{app}\Monitor\FeenicsCardSwipeMonitor.exe"; Components: monitor
