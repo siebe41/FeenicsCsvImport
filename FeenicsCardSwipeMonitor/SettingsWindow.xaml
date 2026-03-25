@@ -27,6 +27,10 @@
                 <Label Content="API Password" FontWeight="Medium"/>
                 <PasswordBox x:Name="TxtPass" Margin="0,2,0,12" Padding="5"/>
 
+                <CheckBox x:Name="ChkLogToFeenics" Content="Enable Feenics API Logging" 
+                          IsChecked="True" FontWeight="Medium" Margin="0,5,0,12" 
+                          Foreground="#333" VerticalContentAlignment="Center"/>
+                
                 <Separator Margin="0,5,0,15"/>
 
                 <Label Content="Reader COM Port &amp; Serial Settings" FontWeight="Medium"/>

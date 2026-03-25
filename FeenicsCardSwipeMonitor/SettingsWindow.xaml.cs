@@ -16,6 +16,7 @@ namespace FeenicsCardSwipeMonitor
 {
     public partial class SettingsWindow : Window
     {
+
         public SettingsWindow()
         {
             InitializeComponent();
@@ -281,10 +282,13 @@ namespace FeenicsCardSwipeMonitor
                 Properties.Settings.Default.EncryptedPassword = Convert.ToBase64String(encryptedBytes);
             }
 
+            bool isLoggingEnabled = ChkLogToFeenics.IsChecked ?? false;
+
             // Save to App Settings
             Properties.Settings.Default.InstanceName = TxtInstance.Text;
             Properties.Settings.Default.ApiUsername = TxtUser.Text;
             Properties.Settings.Default.ComPort = CmbCom.Text;
+            Properties.Settings.Default.LogToFeenics = isLoggingEnabled;
 
             // Save serial settings
             if (CmbBaud.SelectedItem != null) Properties.Settings.Default.BaudRate = (int)CmbBaud.SelectedItem;

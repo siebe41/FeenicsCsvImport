@@ -1,9 +1,13 @@
 ﻿using FeenicsCsvImport.ClassLibrary; // Your Namespace
 using System;
+using System.Globalization;
 using System.IO.Ports;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 using WinForms = System.Windows.Forms;
 
 namespace FeenicsCardSwipeMonitor
@@ -15,10 +19,19 @@ namespace FeenicsCardSwipeMonitor
         private ImportService _importService;
         private UpdateService _updateService;
 
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool SetDllDirectory(string lpPathName);
 
+        private DispatcherTimer _swipeTimer;
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // 1. Find exactly where the .exe is running from (works in Debug and Release)
+            string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
+
+            // 2. Tell Windows: "Always look in this exact folder for unmanaged DLLs first!"
+            SetDllDirectory(appDirectory);
 
             // 1. Setup the Tray Icon
             _trayIcon = new WinForms.NotifyIcon
@@ -36,7 +49,8 @@ namespace FeenicsCardSwipeMonitor
             // 2. Initialize the Library Service
             InitializeImportService();
             // 3. Connect Hardware
-            InitializeScanner(FeenicsCardSwipeMonitor.Properties.Settings.Default.ComPort);
+            StartReader();
+            //InitializeScanner(FeenicsCardSwipeMonitor.Properties.Settings.Default.ComPort);
         }
 
         private void InitializeUpdateChecker()
@@ -128,18 +142,35 @@ namespace FeenicsCardSwipeMonitor
 
                 // 3. Initialize the port with the dynamic user settings
                 _serialPort = new SerialPort(port, baudRate, parity, dataBits, stopBits);
+                _serialPort.DtrEnable = true;
+                _serialPort.RtsEnable = true;
 
-                _serialPort.DataReceived += async (s, e) =>
+
+                _serialPort.DataReceived += (s, e) =>
                 {
-                    string badge = _serialPort.ReadExisting().Trim();
-                    if (string.IsNullOrEmpty(badge)) return;
-
-                    // Immediate Clipboard Copy
-                    Dispatcher.Invoke(() => Clipboard.SetText(badge));
-
-                    // Call your library method to process the check-in
-                    await _importService.PostDeskLoginByCardAsync(badge);
+                    try
+                    {
+                        // Read whatever is in the buffer immediately
+                        string rawData = _serialPort.ReadExisting();
+                        System.Diagnostics.Debug.WriteLine($"SWIPE DETECTED! Raw Data: [{rawData}]");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"COM PORT ERROR: {ex.Message}");
+                    }
                 };
+                //_serialPort.DataReceived += async (s, e) =>
+                //{
+                //    await Task.Delay(50);
+                //    string badge = _serialPort.ReadExisting().Trim();
+                //    if (string.IsNullOrEmpty(badge)) return;
+
+                //    // Immediate Clipboard Copy
+                //    Dispatcher.Invoke(() => Clipboard.SetText(badge));
+
+                //    // Call your library method to process the check-in
+                //    await _importService.PostDeskLoginByCardAsync(badge);
+                //};
 
                 _serialPort.Open();
             }
@@ -156,6 +187,71 @@ namespace FeenicsCardSwipeMonitor
                                 "Connection Error",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Error);
+            }
+        }
+
+
+        public void StartReader()
+        {
+            // 1. Connect directly via the C++ DLL
+            short connected = RfIdeasApi.usbConnect();
+
+            if (connected > 0)
+            {
+                // 2. Set up a timer to check the reader every 250 milliseconds
+                _swipeTimer = new DispatcherTimer();
+                _swipeTimer.Interval = TimeSpan.FromMilliseconds(250);
+                _swipeTimer.Tick += CheckForBadgeSwipe;
+                _swipeTimer.Start();
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Failed to connect to rf IDEAS reader.");
+            }
+        }
+
+        private async void CheckForBadgeSwipe(object sender, EventArgs e)
+        {
+            byte[] buffer = new byte[32];
+
+            // Ask the reader for data
+            short bitCount = RfIdeasApi.GetActiveID(buffer, (short)buffer.Length);
+
+            if (bitCount > 0)
+            {
+                _swipeTimer.Stop();
+
+                // 1. Convert the first 4 bytes of the buffer into a standard 32-bit unsigned integer
+                uint rawCardData = BitConverter.ToUInt32(buffer, 0);
+
+                // 2. Invert the data AND isolate the bottom 16 bits (NO SHIFTING!)
+                uint cardId = (~rawCardData) & 0xFFFF;
+
+                // Optional: Extract the Facility Code
+                uint facilityCode = ((~rawCardData) >> 16) & 0xFF;
+
+                // Format the ID as a 5-digit string
+                string finalBadgeNumber = cardId.ToString("D5");
+
+                // Optional: Make it beep
+                //RfIdeasApi.BeepNow(1, 1);
+
+                // Send to clipboard for testing
+                Clipboard.SetText(finalBadgeNumber);
+
+                //MessageBox.Show(finalBadgeNumber.ToString());
+                // Optional: Make it beep so you know it worked!
+
+                //RfIdeasApi.BeepNow(1, 1);
+
+                if (FeenicsCardSwipeMonitor.Properties.Settings.Default.LogToFeenics)
+                {
+                    await _importService.PostDeskLoginByCardAsync(finalBadgeNumber);
+                }
+
+                // Wait a moment before listening again so the user has time to pull the card away
+                await Task.Delay(1500);
+                _swipeTimer.Start();
             }
         }
 

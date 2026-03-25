@@ -35,5 +35,8 @@
     <Setting Name="StopBits" Type="System.String" Scope="User">
       <Value Profile="(Default)">One</Value>
     </Setting>
+    <Setting Name="LogToFeenics" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
