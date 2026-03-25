@@ -27,23 +27,19 @@ jobs:
     - name: Execute GitVersion
       id: gitversion
       uses: gittools/actions/gitversion/execute@v3.0.0
+      with:
+        updateAssemblyInfo: true  # This is the magic switch for .NET 4.8
 
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
 
     - name: Setup NuGet
       uses: NuGet/setup-nuget@v2
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '6.0.x'
 
-    # Configures the Feenics feed with the insecure HTTP bypass for the runner
     - name: Configure Feenics NuGet Source
       run: |
-        dotnet nuget add source http://nuget-secure.feenics.com/nuget -n Feenics --allow-insecure-connections
-
+        nuget sources add -Name "Feenics" -Source "http://nuget-secure.feenics.com/nuget"
+        
     - name: Restore NuGet Packages
       run: nuget restore FeenicsCsvImport.sln
 
@@ -51,7 +47,7 @@ jobs:
       run: |
         msbuild FeenicsCsvImport.sln `
           /p:Configuration=Release `
-          /p:Version="${{ steps.gitversion.outputs.semVer }}" `
+          /p:Platform="Any CPU" `
           /p:SignManifests=false `
           /p:SignAssembly=false
           
