@@ -120,3 +120,9 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: Output/FeenicsToolsSetup-${{ steps.gitversion.outputs.semVer }}.exe
+    
+    - name: Archive Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: raw-build-output
+        path: FeenicsCsvImport.Gui/bin/Release/
