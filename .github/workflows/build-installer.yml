@@ -38,7 +38,9 @@ jobs:
 
     - name: Configure Feenics NuGet Source
       run: |
-        nuget sources add -Name "Feenics" -Source "http://nuget-secure.feenics.com/nuget"
+        nuget sources add -Name "Feenics" `
+          -Source "http://nuget-secure.feenics.com/nuget" `
+          -AllowInsecureConnections
         
     - name: Restore NuGet Packages
       run: nuget restore FeenicsCsvImport.sln
