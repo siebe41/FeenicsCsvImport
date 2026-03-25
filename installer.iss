@@ -10,6 +10,7 @@ OutputBaseFilename=FeenicsToolsSetup-{#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequired=admin
+ArchitecturesInstallIn64BitMode=x64
 
 [Types]
 Name: "custom"; Description: "Custom installation"; Flags: iscustom
@@ -19,13 +20,11 @@ Name: "monitor"; Description: "Feenics Card Swipe Monitor (System Tray App)"; Ty
 Name: "import"; Description: "Feenics CSV Import Tool"; Types: custom
 
 [Files]
-; Monitor App
-Source: "FeenicsCardSwipeMonitor\bin\Release\FeenicsCardSwipeMonitor.exe"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion
-Source: "FeenicsCardSwipeMonitor\bin\Release\*"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "FeenicsCardSwipeMonitor\bin\x64\Release\FeenicsCardSwipeMonitor.exe"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion
+Source: "FeenicsCardSwipeMonitor\bin\x64\Release\*"; DestDir: "{app}\Monitor"; Components: monitor; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Import Tool - Updated to match your Workflow's Gui project folder
-Source: "FeenicsCsvImport.Gui\bin\Release\FeenicsCsvImport.Gui.exe"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion
-Source: "FeenicsCsvImport.Gui\bin\Release\*"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "FeenicsCsvImport.Gui\bin\x64\Release\FeenicsCsvImport.Gui.exe"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion
+Source: "FeenicsCsvImport.Gui\bin\x64\Release\*"; DestDir: "{app}\ImportTool"; Components: import; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\Card Swipe Monitor"; Filename: "{app}\Monitor\FeenicsCardSwipeMonitor.exe"; Components: monitor
