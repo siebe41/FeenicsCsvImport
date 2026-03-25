@@ -2,26 +2,28 @@
 
 ## Overview
 
-The **FeenicsCardSwipeMonitor** is a Windows system-tray application that listens for badge scans from a serial card reader and posts a **DESK LOGIN** check-in note to the cardholder's profile in Feenics.
+The **FeenicsCardSwipeMonitor** is a Windows system-tray application that listens for badge scans from an rf IDEAS USB card reader and posts a **DESK LOGIN** check-in note to the cardholder's profile in Feenics.
 
 It is designed for front-desk workflows where staff need to log member check-ins without opening the Feenics dashboard.
 
 ## How It Works
 
 1. The application starts in the system tray (Shield icon)
-2. A serial port listener monitors the configured COM port for badge scans
+2. The application connects directly to the USB reader using the **rf IDEAS pcProx API** and continuously polls for a card presence.
 3. When a badge is scanned:
-   - The badge number is copied to the **clipboard**
-   - The cardholder is looked up in Feenics by card number
-   - Any existing `***DESK LOGIN***` note is **replaced** with a new one containing the current timestamp
-   - A **balloon notification** confirms the check-in
+   - The raw 24-bit Wiegand data is pulled from the reader's microchip.
+   - The data is bitwise-inverted and masked to extract the 5-digit encoded Card ID.
+   - The badge number is copied to the **clipboard**.
+   - If Feenics logging is enabled, the cardholder is looked up in Feenics.
+   - Any existing `***DESK LOGIN***` note is **replaced** with a new one containing the current timestamp.
+   - A **balloon notification** confirms the check-in.
 
 ### DESK LOGIN Note
 
 Each scan produces a note on the person's profile in the format:
 
 ```text
-***DESK LOGIN*** - 2025-01-15 14:30:22
+***DESK LOGIN*** - 2026-03-25 14:30:22
 ```
 
 Only one DESK LOGIN note exists per person at any time. Each new scan replaces the previous note, so the profile always shows the most recent check-in.
@@ -41,59 +43,40 @@ Only one DESK LOGIN note exists per person at any time. Each new scan replaces t
 | **Instance Name** | Your Feenics/Acre cloud instance name (case-sensitive) |
 | **API Username** | Feenics login username |
 | **API Password** | Feenics login password |
-| **COM Port** | Serial port for the card reader (e.g., `COM3`) |
+| **Enable Feenics API Logging** | Toggle switch to enable or disable sending the scan to the cloud. When disabled, the reader will only copy the badge number to the clipboard. |
+
+*(Note: Legacy COM port and Serial settings may be visible in the UI but are bypassed by the direct USB SDK connection).*
 
 Click **Save & Encrypt** to persist settings. The password is encrypted using Windows DPAPI (`ProtectedData.Protect` with `DataProtectionScope.CurrentUser`) - it can only be decrypted by the same Windows user on the same machine.
 
-### Finding the COM Port
+## rf IDEAS SDK Integration & Licensing
 
-1. Connect the card reader via USB
-2. Open **Device Manager** -> expand **Ports (COM & LPT)**
-3. Note the COM port number (e.g., `COM3`)
-4. Enter it in the Settings window
+This application integrates with rf IDEAS hardware using the **Universal SDK**. 
+
+To comply with licensing and operational requirements:
+- The application relies on the unmanaged C++ library `pcProxAPI.dll` and its associated helper dependencies.
+- These libraries must be distributed alongside the executable in the application's root directory (`bin\Debug` or the published folder).
+- Because `pcProxAPI.dll` is a 32-bit library, the application **must be compiled and run as an x86 (32-bit) process**. 
+- The DLL location is resolved at runtime using the Windows API `SetDllDirectory` hook to ensure reliable execution across different environments.
 
 ## Testing
 
 ### Test Connection
 
-Click the **Test Connection** button in the Settings window to verify both connections:
+Click the **Test Connection** button in the Settings window to verify the system:
 
-- **API**: Authenticates with the Feenics API and displays the connected instance name
-- **COM**: Opens and closes the serial port to confirm it exists and is available
-
-Results appear in the status area:
-
-```text
-API: OK - connected to "OaksLanding".
-COM: OK - COM3 opened successfully.
-```
+- **API**: Authenticates with the Feenics API and displays the connected instance name.
+- **Reader**: Probes the USB ports via the SDK to confirm the rf IDEAS reader is attached and responding.
 
 ### Simulate Scan
 
 To test the full check-in flow without a physical card reader:
 
-1. Enter a badge number in the **Simulate Badge Scan** field
+1. Enter a 5-digit badge number in the **Simulate Badge Scan** field
 2. Click **Simulate Scan**
-3. The application runs the same flow as a real scan:
-   - Badge number is copied to the clipboard
-   - Cardholder is looked up by card number
-   - DESK LOGIN note is replaced
-4. Progress and log messages appear in the status area
+3. The application runs the same flow as a real scan.
 
 > **Tip**: Use credentials from the form fields if you haven't saved yet. The simulate button reads form values first and falls back to saved settings.
-
-## Serial Port Configuration
-
-The card reader is configured with these serial parameters:
-
-| Parameter | Value |
-|---|---|
-| Baud rate | 9600 |
-| Data bits | 8 |
-| Parity | None |
-| Stop bits | 1 |
-
-These match the default settings for most USB HID badge readers operating in serial/keyboard-wedge mode.
 
 ## Card Lookup
 
@@ -122,7 +105,7 @@ Right-click the Shield icon in the system tray:
 | Menu Item | Action |
 |---|---|
 | **Settings** | Opens the configuration window |
-| **Exit** | Closes the serial port, hides the tray icon, and shuts down |
+| **Exit** | Disconnects the reader, hides the tray icon, and shuts down |
 
 ## Architecture
 
@@ -130,21 +113,21 @@ The badge listener is a WPF application with no main window (`ShutdownMode="OnEx
 
 | File | Purpose |
 |---|---|
-| `App.xaml.cs` | Entry point - creates tray icon, initializes `ImportService`, opens serial port |
-| `SettingsWindow.xaml` / `.cs` | Configuration UI - credentials, COM port, test connection, simulate scan |
-| `Properties\Settings.settings` | Persisted user settings (instance, username, encrypted password, COM port) |
+| `App.xaml.cs` | Entry point - sets DLL directories, creates tray icon, initializes `ImportService`, connects to USB reader |
+| `SettingsWindow.xaml` / `.cs` | Configuration UI - credentials, logging toggle, test connection, simulate scan |
+| `Properties\Settings.settings` | Persisted user settings (instance, username, encrypted password, logging preference) |
 
 It depends on the shared **FeenicsCsvImport.ClassLibrary** project for all Feenics API interaction via `ImportService`.
 
 ## Troubleshooting
 
-### COM port errors
+### Reader & SDK Errors
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `COM: FAILED - The port 'COMx' does not exist` | Wrong port number | Check Device Manager for the correct port |
-| `COM: FAILED - Access to the port is denied` | Another application has the port open | Close other serial terminal apps or badge software |
-| Reader works briefly then stops | USB power management | Disable USB selective suspend in Power Options |
+| `BadImageFormatException` crash on launch | Architecture mismatch | The app is attempting to run as 64-bit. Ensure the project's Platform Target is explicitly set to **x86** in the Configuration Manager. |
+| `DllNotFoundException` for `pcProxAPI.dll` | Missing dependencies | The application cannot find the SDK library or its helper files. Ensure all DLLs from the rf IDEAS installation folder were copied to the output directory. |
+| Reader beeps but no scan registers | SDK Polling Failure | Ensure the reader is an SDK-compatible model (e.g., AK0 suffix) and not a keystroke emulator. Disconnect and reconnect the USB. |
 
 ### API errors
 
