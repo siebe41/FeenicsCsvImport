@@ -87,6 +87,9 @@
             </Grid.ColumnDefinitions>
 
             <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="Check for Updates" Width="120" Height="32" Click="BtnCheckUpdate_Click" Background="Transparent" BorderBrush="#CCC"/>
+            <Button x:Name="BtnDownloadUpdate" Grid.Column="0" Content="⭐ Download Update" Width="140" Height="32" 
+                    Click="BtnDownloadUpdate_Click" Background="#FF9800" Foreground="White" FontWeight="SemiBold" 
+                    Margin="125,0,0,0" Visibility="Collapsed" Cursor="Hand" BorderThickness="0"/>
 
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="BtnTest" Content="Test Connection" Width="120" Height="32" Margin="0,0,10,0" Click="BtnTest_Click" Background="#E1E1E1"/>

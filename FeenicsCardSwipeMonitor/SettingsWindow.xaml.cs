@@ -16,6 +16,7 @@ namespace FeenicsCardSwipeMonitor
 {
     public partial class SettingsWindow : Window
     {
+        private string _updateUrl;
 
         public SettingsWindow()
         {
@@ -242,6 +243,7 @@ namespace FeenicsCardSwipeMonitor
         private async void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
         {
             BtnCheckUpdate.IsEnabled = false;
+            BtnDownloadUpdate.Visibility = Visibility.Collapsed;
             TxtStatus.Text = "Checking GitHub for updates...";
 
             try
@@ -256,8 +258,8 @@ namespace FeenicsCardSwipeMonitor
                     if (result.IsUpdateAvailable)
                     {
                         TxtStatus.Text = $"Update Available! You are on {currentVersion.ToString(3)}, but {result.LatestVersion} is available.";
-                        // Optional: Automatically open browser
-                        // System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(result.ReleaseUrl) { UseShellExecute = true });
+                        _updateUrl = result.ReleaseUrl;
+                        BtnDownloadUpdate.Visibility = Visibility.Visible;
                     }
                     else
                     {
@@ -271,6 +273,14 @@ namespace FeenicsCardSwipeMonitor
             }
 
             BtnCheckUpdate.IsEnabled = true;
+        }
+
+        private void BtnDownloadUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(_updateUrl))
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_updateUrl) { UseShellExecute = true });
+            }
         }
 
         private void BtnSave_Click(object sender, RoutedEventArgs e)
