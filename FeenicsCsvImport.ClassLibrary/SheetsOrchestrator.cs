@@ -193,22 +193,34 @@ namespace FeenicsCsvImport.ClassLibrary
 		{
 			using (var writer = new StreamWriter(filePath))
 			{
+				// Google Sheets API omits trailing empty cells, producing jagged rows.
+				// Determine the expected column count from the header row and pad
+				// shorter rows so CsvHelper can map every column correctly.
+				int columnCount = data.Count > 0 ? data[0].Count : 0;
 
 				foreach (var row in data)
 				{
-					var formattedRow = row.Select(cell =>
+					// Track the actual column count across all rows
+					if (row.Count > columnCount)
+						columnCount = row.Count;
+				}
+
+				foreach (var row in data)
+				{
+					var cells = new List<string>(columnCount);
+					for (int c = 0; c < columnCount; c++)
 					{
-						string value = cell?.ToString() ?? "";
+						string value = c < row.Count ? (row[c]?.ToString() ?? "") : "";
 
 						// Basic escaping: If a cell contains a comma or quote, wrap it in quotes
 						if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
 						{
-							return $"\"{value.Replace("\"", "\"\"")}\"";
+							value = $"\"{value.Replace("\"", "\"\"")}\"";
 						}
-						return value;
-					});
+						cells.Add(value);
+					}
 
-					writer.WriteLine(string.Join(",", formattedRow));
+					writer.WriteLine(string.Join(",", cells));
 				}
 			}
 		}

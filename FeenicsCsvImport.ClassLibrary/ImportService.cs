@@ -302,6 +302,13 @@ namespace FeenicsCsvImport.ClassLibrary
                 for (int i = 0; i < allRecords.Count; i++)
                 {
                     var r = allRecords[i];
+
+                    // Normalize whitespace on all fields to prevent matching issues
+                    if (r.Name != null) r.Name = r.Name.Trim();
+                    if (r.Address != null) r.Address = r.Address.Trim();
+                    if (r.Phone != null) r.Phone = r.Phone.Trim();
+                    if (r.Email != null) r.Email = r.Email.Trim();
+
                     if (string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Address))
                     {
                         skippedEmpty++;
@@ -318,6 +325,26 @@ namespace FeenicsCsvImport.ClassLibrary
                     Log($"Skipped {skippedEmpty} record(s) with missing Name or Address.");
                 }
 
+                // Deduplicate CSV records by Name (keep the last occurrence for each name)
+                var deduped = new Dictionary<string, UserCsvModel>(StringComparer.OrdinalIgnoreCase);
+                int skippedCsvDuplicates = 0;
+                foreach (var r in records)
+                {
+                    if (deduped.ContainsKey(r.Name))
+                    {
+                        skippedCsvDuplicates++;
+                        Log($"Duplicate name in CSV: '{r.Name}' — keeping last occurrence.");
+                    }
+                    deduped[r.Name] = r;
+                }
+                records = deduped.Values.ToList();
+
+                if (skippedCsvDuplicates > 0)
+                {
+                    Log($"Removed {skippedCsvDuplicates} duplicate name(s) from CSV.");
+                    result.Warnings.Add($"{skippedCsvDuplicates} duplicate name(s) in CSV were consolidated.");
+                }
+
                 if (records.Count == 0)
                 {
                     result.Errors.Add("No valid records found in CSV. Every row must have a Name and Address.");
@@ -330,7 +357,7 @@ namespace FeenicsCsvImport.ClassLibrary
 
                 // 3. Query existing people to check for duplicates
                 ReportProgress(progress, "Checking for existing people...", 12);
-                var existingByName = new Dictionary<string, PersonInfo>();
+                var existingByName = new Dictionary<string, PersonInfo>(StringComparer.OrdinalIgnoreCase);
                 int page = 0;
                 const int pageSize = 1000;
                 while (true)
@@ -341,8 +368,9 @@ namespace FeenicsCsvImport.ClassLibrary
 
                     foreach (var ep in peoplePage)
                     {
-                        if (!existingByName.ContainsKey(ep.CommonName))
-                            existingByName[ep.CommonName] = ep;
+                        var epName = ep.CommonName?.Trim() ?? "";
+                        if (epName.Length > 0 && !existingByName.ContainsKey(epName))
+                            existingByName[epName] = ep;
                     }
 
                     if (peoplePage.Count() < pageSize)
@@ -358,11 +386,14 @@ namespace FeenicsCsvImport.ClassLibrary
                 var peopleToCreate = new List<PersonInfo>();
                 var peopleToUpdate = new List<(PersonInfo Existing, UserCsvModel Record)>();
                 var skippedDuplicates = new List<string>();
-                var skippedNames = new HashSet<string>();
+                var skippedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var record in records)
                 {
-                    var nameParts = record.Name.Split(' ');
+                    var nameParts = record.Name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var givenName = nameParts[0];
+                    var surname = nameParts.Length > 1 ? string.Join(" ", nameParts, 1, nameParts.Length - 1) : "";
+
                     if (existingByName.TryGetValue(record.Name, out var existingPerson))
                     {
                         switch (_config.DuplicateHandling)
@@ -375,8 +406,8 @@ namespace FeenicsCsvImport.ClassLibrary
                                 Log($"Creating new entry for '{record.Name}' even though one already exists (Key={existingPerson.Key}).");
                                 var duplicatePerson = new PersonInfo
                                 {
-                                    GivenName = nameParts[0],
-                                    Surname = nameParts.Length > 1 ? nameParts[1] : "",
+                                    GivenName = givenName,
+                                    Surname = surname,
                                     CommonName = record.Name,
                                     Addresses = new AddressInfo[]
                                     {
@@ -401,8 +432,8 @@ namespace FeenicsCsvImport.ClassLibrary
                     {
                         var newPerson = new PersonInfo
                         {
-                            GivenName = nameParts[0],
-                            Surname = nameParts.Length > 1 ? nameParts[1] : "",
+                            GivenName = givenName,
+                            Surname = surname,
                             CommonName = record.Name,
                             Addresses = new AddressInfo[]
                             {
@@ -453,9 +484,9 @@ namespace FeenicsCsvImport.ClassLibrary
                         {
                             try
                             {
-                                var nameParts = capturedRecord.Name.Split(' ');
+                                var nameParts = capturedRecord.Name.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                                 capturedExisting.GivenName = nameParts[0];
-                                capturedExisting.Surname = nameParts.Length > 1 ? nameParts[1] : "";
+                                capturedExisting.Surname = nameParts.Length > 1 ? string.Join(" ", nameParts, 1, nameParts.Length - 1) : "";
 
                                 capturedExisting.Addresses = new AddressInfo[]
                                 {
@@ -492,7 +523,7 @@ namespace FeenicsCsvImport.ClassLibrary
                 // 5. Query for all people to match records for access level assignment.
                 // Only needed for people that were just created or updated (not skipped).
                 ReportProgress(progress, "Retrieving people for access level assignment...", 30);
-                var matchedPeopleByName = new Dictionary<string, PersonInfo>();
+                var matchedPeopleByName = new Dictionary<string, PersonInfo>(StringComparer.OrdinalIgnoreCase);
 
                 // For updates, we already have the PersonInfo objects
                 foreach (var (existing, record) in peopleToUpdate)
@@ -502,7 +533,7 @@ namespace FeenicsCsvImport.ClassLibrary
                 }
 
                 // For newly created people (and CreateNew duplicates), we need to query the API
-                var namesToFind = new HashSet<string>();
+                var namesToFind = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var record in records)
                 {
                     if (skippedNames.Contains(record.Name))
@@ -524,10 +555,11 @@ namespace FeenicsCsvImport.ClassLibrary
 
                         foreach (var p in peoplePage)
                         {
-                            if (namesToFind.Contains(p.CommonName) && !matchedPeopleByName.ContainsKey(p.CommonName))
+                            var pName = p.CommonName?.Trim() ?? "";
+                            if (namesToFind.Contains(pName) && !matchedPeopleByName.ContainsKey(pName))
                             {
-                                matchedPeopleByName[p.CommonName] = p;
-                                namesToFind.Remove(p.CommonName);
+                                matchedPeopleByName[pName] = p;
+                                namesToFind.Remove(pName);
                             }
                         }
 
@@ -633,7 +665,7 @@ namespace FeenicsCsvImport.ClassLibrary
                         try
                         {
                             await ExecuteWithRetryAsync(
-                                () => client.AddScheduledAccessLevelBatchForPersonAsync(capturedPerson, capturedLinks),
+                                () => client.SetScheduledAccessLevelBatchForPersonAsync(capturedPerson, capturedLinks),
                                 capturedDesc);
                             Interlocked.Add(ref assignedCount, capturedCount);
                             Log($"   -> SUCCESS: {capturedDesc}");
