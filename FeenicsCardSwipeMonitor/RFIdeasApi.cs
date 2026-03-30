@@ -25,5 +25,21 @@ namespace FeenicsCardSwipeMonitor
         // Forces the reader to beep (great for user feedback)
         [DllImport("pcProxAPI.dll", CallingConvention = CallingConvention.StdCall)]
         public static extern short BeepNow(byte count, byte beepType);
+
+        // Reads the current device configuration into memory
+        [DllImport("pcProxAPI.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern short ReadCfg();
+
+        // Writes the in-memory configuration back to the device
+        [DllImport("pcProxAPI.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern short WriteCfg();
+
+        // Sets the buzzer duration on card read (0 = silent)
+        [DllImport("pcProxAPI.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern void SetBuzzerOnDuration(byte duration);
+
+        // Gets the current buzzer-on duration
+        [DllImport("pcProxAPI.dll", CallingConvention = CallingConvention.StdCall)]
+        public static extern byte GetBuzzerOnDuration();
     }
 }

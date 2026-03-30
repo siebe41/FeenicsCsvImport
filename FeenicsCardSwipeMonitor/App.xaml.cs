@@ -198,6 +198,18 @@ namespace FeenicsCardSwipeMonitor
 
             if (connected > 0)
             {
+                // Silence the reader's default beep so we control feedback ourselves
+                try
+                {
+                    RfIdeasApi.ReadCfg();
+                    RfIdeasApi.SetBuzzerOnDuration(0);
+                    RfIdeasApi.WriteCfg();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Could not silence reader beep: {ex.Message}");
+                }
+
                 // 2. Set up a timer to check the reader every 250 milliseconds
                 _swipeTimer = new DispatcherTimer();
                 _swipeTimer.Interval = TimeSpan.FromMilliseconds(250);
@@ -221,32 +233,36 @@ namespace FeenicsCardSwipeMonitor
             {
                 _swipeTimer.Stop();
 
-                // 1. Convert the first 4 bytes of the buffer into a standard 32-bit unsigned integer
-                uint rawCardData = BitConverter.ToUInt32(buffer, 0);
-
-                // 2. Invert the data AND isolate the bottom 16 bits (NO SHIFTING!)
-                uint cardId = (~rawCardData) & 0xFFFF;
-
-                // Optional: Extract the Facility Code
-                uint facilityCode = ((~rawCardData) >> 16) & 0xFF;
-
-                // Format the ID as a 5-digit string
-                string finalBadgeNumber = cardId.ToString("D5");
-
-                // Optional: Make it beep
-                //RfIdeasApi.BeepNow(1, 1);
-
-                // Send to clipboard for testing
-                Clipboard.SetText(finalBadgeNumber);
-
-                //MessageBox.Show(finalBadgeNumber.ToString());
-                // Optional: Make it beep so you know it worked!
-
-                //RfIdeasApi.BeepNow(1, 1);
-
-                if (FeenicsCardSwipeMonitor.Properties.Settings.Default.LogToFeenics)
+                try
                 {
-                    await _importService.PostDeskLoginByCardAsync(finalBadgeNumber);
+                    // 1. Convert the first 4 bytes of the buffer into a standard 32-bit unsigned integer
+                    uint rawCardData = BitConverter.ToUInt32(buffer, 0);
+
+                    // 2. Invert the data AND isolate the bottom 16 bits (NO SHIFTING!)
+                    uint cardId = (~rawCardData) & 0xFFFF;
+
+                    // Optional: Extract the Facility Code
+                    uint facilityCode = ((~rawCardData) >> 16) & 0xFF;
+
+                    // Format the ID as a 5-digit string
+                    string finalBadgeNumber = cardId.ToString("D5");
+
+                    // Copy to clipboard first
+                    Clipboard.SetText(finalBadgeNumber);
+
+                    // Single beep to confirm the scan was captured
+                    RfIdeasApi.BeepNow(1, 1);
+
+                    if (FeenicsCardSwipeMonitor.Properties.Settings.Default.LogToFeenics)
+                    {
+                        await _importService.PostDeskLoginByCardAsync(finalBadgeNumber);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Triple beep to signal an error
+                    RfIdeasApi.BeepNow(3, 1);
+                    System.Diagnostics.Debug.WriteLine($"Badge swipe error: {ex.Message}");
                 }
 
                 // Wait a moment before listening again so the user has time to pull the card away
