@@ -31,6 +31,7 @@ namespace FeenicsCardSwipeMonitor
             // Load existing non-sensitive settings
             TxtInstance.Text = Properties.Settings.Default.InstanceName;
             TxtUser.Text = Properties.Settings.Default.ApiUsername;
+            ChkLogToFeenics.IsChecked = Properties.Settings.Default.LogToFeenics;
 
             // Load COM Ports and Serial Settings
             LoadComPorts();
@@ -297,6 +298,12 @@ namespace FeenicsCardSwipeMonitor
             if (CmbStopBits.SelectedItem != null) Properties.Settings.Default.StopBits = CmbStopBits.SelectedItem.ToString();
 
             Properties.Settings.Default.Save();
+
+            // Apply settings immediately so no restart is needed
+            if (Application.Current is App app)
+            {
+                app.ApplySettings();
+            }
 
             this.Close();
         }

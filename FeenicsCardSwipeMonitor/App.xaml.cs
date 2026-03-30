@@ -256,6 +256,9 @@ namespace FeenicsCardSwipeMonitor
                     if (FeenicsCardSwipeMonitor.Properties.Settings.Default.LogToFeenics)
                     {
                         await _importService.PostDeskLoginByCardAsync(finalBadgeNumber);
+
+                        // Second beep to confirm the API call completed successfully
+                        RfIdeasApi.BeepNow(2, 1);
                     }
                 }
                 catch (Exception ex)
@@ -273,10 +276,11 @@ namespace FeenicsCardSwipeMonitor
 
         private void Notify(string message)
         {
-            // Only show balloon tips for relevant scan info to avoid spamming
-            if (message.Contains("DESK LOGIN"))
+            // Only show balloon tips for errors — routine success feedback is handled
+            // by the reader beeps so balloon notifications don't clutter the desktop.
+            if (message.Contains("ERROR") || message.Contains("FAILED") || message.Contains("not found"))
             {
-                _trayIcon.ShowBalloonTip(2000, "Check-In Success", message, WinForms.ToolTipIcon.Info);
+                _trayIcon.ShowBalloonTip(3000, "Badge Error", message, WinForms.ToolTipIcon.Warning);
             }
         }
 
@@ -290,6 +294,17 @@ namespace FeenicsCardSwipeMonitor
                 return Encoding.UTF8.GetString(decrypted);
             }
             catch { return ""; }
+        }
+
+        /// <summary>
+        /// Reinitializes the ImportService with the current saved settings.
+        /// Called after the SettingsWindow saves new credentials so they
+        /// take effect immediately without restarting the application.
+        /// </summary>
+        public void ApplySettings()
+        {
+            InitializeImportService();
+            System.Diagnostics.Debug.WriteLine("Settings applied — ImportService reinitialized.");
         }
 
         private void ExitApp()
