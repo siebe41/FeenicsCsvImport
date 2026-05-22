@@ -1,6 +1,6 @@
 # Feenics CSV Import
 
-A Windows desktop application for bulk-importing people from CSV files into the [Feenics (Acre Security)](https://www.acresecurity.com/) cloud access control platform, with automatic age-based scheduled access level assignment.
+A Windows desktop application for bulk-importing people from CSV files into the [Feenics (Acre Security)](https://www.acresecurity.com/) cloud access control platform, with automatic age-based scheduled access level assignment.  
 
 ## Overview
 
