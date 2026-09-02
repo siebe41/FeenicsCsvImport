@@ -83,7 +83,7 @@ namespace FeenicsCsvImport.ClassLibrary
         public async Task DumpRecentEventsAsync(int count = 5)
         {
             var instance = await GetInstanceAsync();
-            var token = await GetAccessTokenAsync(instance.CommonName);
+            var token = await GetAccessTokenAsync(_instance);
 
             var pipeline = new JArray
             {
@@ -125,7 +125,7 @@ namespace FeenicsCsvImport.ClassLibrary
                 var instance = await client.GetCurrentInstanceAsync();
                 Log($"Connected to: {instance.CommonName}");
 
-                var token = await GetAccessTokenAsync(instance.CommonName);
+                var token = await GetAccessTokenAsync(_instance);
                 DateTime sinceUtc = DateTime.UtcNow.AddMonths(-months);
 
                 Log($"Querying event history for door matching '{doorNameContains}' since {sinceUtc:yyyy-MM-dd}...");
@@ -236,7 +236,7 @@ namespace FeenicsCsvImport.ClassLibrary
         /// a bearer token usable for the raw aggregate/Events call. Client id/secret and username
         /// format ("instance\username") come from Feenics' published API quick-start docs.
         /// </summary>
-        private async Task<string> GetAccessTokenAsync(string instanceCommonName)
+        private async Task<string> GetAccessTokenAsync(string instanceName)
         {
             using (var http = new HttpClient())
             {
@@ -245,9 +245,9 @@ namespace FeenicsCsvImport.ClassLibrary
                     ["grant_type"] = "password",
                     ["client_id"] = TokenClientId,
                     ["client_secret"] = TokenClientSecret,
-                    ["username"] = $"{instanceCommonName}\\{_username}",
+                    ["username"] = $"{instanceName}\\{_username}",
                     ["password"] = _password,
-                    ["instance"] = instanceCommonName,
+                    ["instance"] = instanceName,
                     ["sendonetimepassword"] = "false"
                 });
 
