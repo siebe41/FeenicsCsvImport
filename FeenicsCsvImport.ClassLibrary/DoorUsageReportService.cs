@@ -332,7 +332,12 @@ namespace FeenicsCsvImport.ClassLibrary
             {
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var url = $"{_apiUrl}/api/f/{instanceKey}/aggregate/Events";
-                var content = new StringContent(pipeline.ToString(Formatting.None), Encoding.UTF8, "application/json");
+
+                // Confirmed against a live instance: the endpoint rejects an array of raw nested
+                // stage objects ("unexpected character '{'"/"':'" parser errors). It wants each
+                // pipeline stage individually JSON-encoded as a string inside the outer array.
+                var stageStrings = new JArray(pipeline.Select(stage => (JToken)new JValue(stage.ToString(Formatting.None))));
+                var content = new StringContent(stageStrings.ToString(Formatting.None), Encoding.UTF8, "application/json");
 
                 var response = await http.PostAsync(url, content);
                 var body = await response.Content.ReadAsStringAsync();
