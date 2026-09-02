@@ -79,6 +79,7 @@
   <ItemGroup>
     <Compile Include="AccessLevelRule.cs" />
     <Compile Include="AddressNormalizer.cs" />
+    <Compile Include="DoorUsageReportService.cs" />
     <Compile Include="DuplicateHandling.cs" />
     <Compile Include="SavedSettings.cs" />
     <Compile Include="ImportConfiguration.cs" />

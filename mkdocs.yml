@@ -15,6 +15,7 @@ nav:
   - Home: index.md
   - User Guide: User-Guide.md
   - Badge Listener: Badge-Listener.md
+  - Door Usage Report: Door-Usage-Report.md
   - CSV Specification: CSV-Specification.md
   - Access Level Rules: Access-Level-Rules.md
   - Troubleshooting: Troubleshooting.md

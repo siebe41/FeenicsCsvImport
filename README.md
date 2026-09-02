@@ -26,6 +26,7 @@ The application connects to the Feenics Keep API, creates person records, and as
 - **Paginated people lookup** — correctly detects existing people even in large instances
 - **Preview window** — review calculated access dates and statuses before importing
 - **Rate-limit retry** — automatic exponential backoff with jitter on HTTP 429 responses
+- **Door usage report** — `FeenicsCsvImport.exe door-usage-report` lists everyone who used a given door (e.g. a side entrance) over a time window, with the email from their profile — see [docs/Door-Usage-Report.md](docs/Door-Usage-Report.md)
 - **Persistent settings** — connection details, rules, and preferences are saved to `%AppData%\FeenicsCsvImport\settings.json` (password is never saved)
 - **Cancellation support** — cancel a running import at any time
 
