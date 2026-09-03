@@ -93,7 +93,7 @@ namespace FeenicsCsvImport.ClassLibrary
 
             var pipeline = new JArray
             {
-                new JObject { ["$match"] = new JObject { ["OccurredOn"] = new JObject { ["$gte"] = sinceUtc.ToString("O", CultureInfo.InvariantCulture) } } },
+                new JObject { ["$match"] = new JObject { ["OccurredOn"] = new JObject { ["$gte"] = EjsonDate(sinceUtc) } } },
                 new JObject { ["$sort"] = new JObject { ["OccurredOn"] = -1 } },
                 new JObject { ["$limit"] = count }
             };
@@ -317,7 +317,7 @@ namespace FeenicsCsvImport.ClassLibrary
 
             var conditions = new JArray
             {
-                new JObject { ["OccurredOn"] = new JObject { ["$gte"] = sinceUtc.ToString("O", CultureInfo.InvariantCulture) } },
+                new JObject { ["OccurredOn"] = new JObject { ["$gte"] = EjsonDate(sinceUtc) } },
                 new JObject
                 {
                     ["$or"] = new JArray
@@ -386,6 +386,18 @@ namespace FeenicsCsvImport.ClassLibrary
                     return value;
             }
             return null;
+        }
+
+        /// <summary>
+        /// MongoDB Extended JSON representation of a date. The aggregate/Events endpoint parses each
+        /// pipeline stage as strict EJSON (confirmed against a live instance: a plain ISO date string
+        /// silently failed to type-match the BSON Date field, causing a full-collection scan that hit
+        /// MongoExecutionTimeoutException instead of an outright error), so date literals sent in a
+        /// $match must use this $date wrapper rather than a bare string.
+        /// </summary>
+        private static JObject EjsonDate(DateTime value)
+        {
+            return new JObject { ["$date"] = value.ToString("O", CultureInfo.InvariantCulture) };
         }
 
         private static DateTime? ParseEventDate(JToken token)
