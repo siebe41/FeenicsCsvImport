@@ -350,6 +350,12 @@ namespace FeenicsCsvImport.ClassLibrary
         {
             using (var http = new HttpClient())
             {
+                // HttpClient's own default request timeout is 100s, independent of the server-side
+                // ?queryTimeout= we're requesting below -- confirmed against a live instance: the
+                // client cancelled the request itself ("A task was canceled.") before a query that
+                // was allowed up to 300s server-side could finish. Give it enough room to actually
+                // wait for the server-side budget we asked for.
+                http.Timeout = TimeSpan.FromSeconds(queryTimeoutSeconds + 30);
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
                 var url = $"{_apiUrl}/api/f/{instanceKey}/aggregate/Events?queryTimeout={queryTimeoutSeconds}";
 
@@ -359,7 +365,16 @@ namespace FeenicsCsvImport.ClassLibrary
                 var stageStrings = new JArray(pipeline.Select(stage => (JToken)new JValue(stage.ToString(Formatting.None))));
                 var content = new StringContent(stageStrings.ToString(Formatting.None), Encoding.UTF8, "application/json");
 
-                var response = await http.PostAsync(url, content);
+                HttpResponseMessage response;
+                try
+                {
+                    response = await http.PostAsync(url, content);
+                }
+                catch (TaskCanceledException)
+                {
+                    throw new Exception($"Event query timed out client-side after {queryTimeoutSeconds + 30}s (server-side budget requested: {queryTimeoutSeconds}s). Try a larger --query-timeout, up to the API's 600s cap.");
+                }
+
                 var body = await response.Content.ReadAsStringAsync();
                 if (!response.IsSuccessStatusCode)
                     throw new Exception($"Event query failed ({(int)response.StatusCode}): {body}");
