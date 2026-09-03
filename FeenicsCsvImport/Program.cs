@@ -109,6 +109,7 @@ namespace FeenicsCsvImport
             string outPath = null;
             bool includeDenied = false;
             int dumpCount = 0;
+            int dumpDays = 30;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -129,6 +130,9 @@ namespace FeenicsCsvImport
                     case "--dump-events":
                         dumpCount = int.Parse(args[++i]);
                         break;
+                    case "--dump-events-days":
+                        dumpDays = int.Parse(args[++i]);
+                        break;
                     default:
                         Console.WriteLine($"Unknown argument: {args[i]}");
                         break;
@@ -142,7 +146,7 @@ namespace FeenicsCsvImport
                 if (dumpCount > 0)
                 {
                     Console.WriteLine($"Dumping the {dumpCount} most recent raw event(s) to help verify field names...");
-                    await service.DumpRecentEventsAsync(dumpCount);
+                    await service.DumpRecentEventsAsync(dumpCount, dumpDays);
                     return;
                 }
 

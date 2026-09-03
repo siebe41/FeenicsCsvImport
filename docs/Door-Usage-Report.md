@@ -28,6 +28,7 @@ It authenticates the same way the CSV sync job does, using these environment var
 | `--out <path>` | *(none)* | Also write the results to a CSV file |
 | `--include-denied` | off | Include denied/failed attempts, not just granted access |
 | `--dump-events <n>` | *(none)* | Diagnostic mode — prints the N most recent raw events as JSON instead of running the report |
+| `--dump-events-days <n>` | `30` | How far back `--dump-events` looks. Narrowing this keeps the query cheap on a large Events collection (see below); widen it if your last event was longer ago than this |
 
 ## First run: verify field names with `--dump-events`
 
@@ -48,6 +49,14 @@ This prints the 5 most recent events as raw JSON. Confirm that:
 
 If your instance uses different field names, adjust `BuildMatchStage` and `ExtractLinkedKey` in
 `FeenicsCsvImport.ClassLibrary/DoorUsageReportService.cs` accordingly.
+
+### Notes learned from a live instance
+
+- The `aggregate/Events` endpoint expects each pipeline stage as an individually JSON-encoded
+  *string* inside the outer array, not a raw nested object. The code already does this.
+- Sorting/limiting the Events collection with no date filter first can trigger a server-side
+  `MongoExecutionTimeoutException` — the Events collection can be large. Both `--dump-events` and
+  the main report always put a date `$match` first in the pipeline for this reason.
 
 ## Output
 

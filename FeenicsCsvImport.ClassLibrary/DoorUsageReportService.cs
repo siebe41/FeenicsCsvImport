@@ -77,22 +77,33 @@ namespace FeenicsCsvImport.ClassLibrary
         private void Log(string message) => _logger(message);
 
         /// <summary>
-        /// Fetches and logs the N most recent raw events (unfiltered) as JSON, to help identify the
-        /// correct field names/shapes for your instance before trusting RunAsync's results.
+        /// Fetches and logs the N most recent raw events (within the last daysBack days) as JSON,
+        /// to help identify the correct field names/shapes for your instance before trusting
+        /// RunAsync's results. A date filter always leads the pipeline: on a live instance, sorting
+        /// the full Events collection with no $match first hit a server-side MongoExecutionTimeoutException,
+        /// so this narrows to a recent window before sorting, same as RunAsync does.
         /// </summary>
-        public async Task DumpRecentEventsAsync(int count = 5)
+        public async Task DumpRecentEventsAsync(int count = 5, int daysBack = 30)
         {
             var instance = await GetInstanceAsync();
             var token = await GetAccessTokenAsync(_instance);
 
+            DateTime sinceUtc = DateTime.UtcNow.AddDays(-daysBack);
+            Log($"Looking at events since {sinceUtc:yyyy-MM-dd} (last {daysBack} day(s))...");
+
             var pipeline = new JArray
             {
+                new JObject { ["$match"] = new JObject { ["OccurredOn"] = new JObject { ["$gte"] = sinceUtc.ToString("O", CultureInfo.InvariantCulture) } } },
                 new JObject { ["$sort"] = new JObject { ["OccurredOn"] = -1 } },
                 new JObject { ["$limit"] = count }
             };
 
             var events = await PostAggregateEventsAsync(token, instance.Key.ToString(), pipeline);
             Log($"--- {events.Count} most recent event(s) (raw JSON) ---");
+            if (events.Count == 0)
+            {
+                Log($"No events found in the last {daysBack} day(s). Try a larger --dump-events-days value.");
+            }
             foreach (var ev in events)
             {
                 Log(ev.ToString(Formatting.Indented));
