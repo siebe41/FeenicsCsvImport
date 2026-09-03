@@ -29,7 +29,7 @@ It authenticates the same way the CSV sync job does, using these environment var
 | `--include-denied` | off | Include denied/failed attempts, not just granted access |
 | `--dump-events <n>` | *(none)* | Diagnostic mode — prints the N most recent raw events as JSON instead of running the report |
 | `--dump-events-days <n>` | `30` | How far back `--dump-events` looks. Narrowing this keeps the query cheap on a large Events collection (see below); widen it if your last event was longer ago than this |
-| `--query-timeout <ms>` | `120000` | Passed as `?queryTimeout=` on the aggregate/Events request. Raise this if you see `MongoExecutionTimeoutException` |
+| `--query-timeout <seconds>` | `300` | Passed as `?queryTimeout=` on the aggregate/Events request. The live API caps this at 600 seconds (10 minutes) and rejects anything outside 1-600 |
 
 ## First run: verify field names with `--dump-events`
 
@@ -63,8 +63,10 @@ If your instance uses different field names, adjust `BuildMatchStage` and `Extra
   matches nothing and Mongo still scans the whole collection to prove it.
 - Even a well-targeted, date-narrowed query can still hit `MongoExecutionTimeoutException` if
   `OccurredOn` isn't indexed on your instance (a full collection scan is required regardless of how
-  narrow the match window is). If you see this, raise `--query-timeout` (milliseconds) — the units
-  aren't confirmed from documentation, so try a much larger value if a moderate one doesn't help.
+  narrow the match window is). `--query-timeout` (seconds, capped at 600 by the live API) raises
+  the budget for that scan; the tool defaults to 300. If 600 still isn't enough, the collection is
+  likely too large to full-scan at all and the query needs a supporting index — that's outside what
+  this tool can fix from the client side.
 
 ## Output
 
