@@ -110,6 +110,7 @@ namespace FeenicsCsvImport
             bool includeDenied = false;
             int dumpCount = 0;
             int dumpDays = 30;
+            int queryTimeoutMs = 120000;
 
             for (int i = 1; i < args.Length; i++)
             {
@@ -133,6 +134,9 @@ namespace FeenicsCsvImport
                     case "--dump-events-days":
                         dumpDays = int.Parse(args[++i]);
                         break;
+                    case "--query-timeout":
+                        queryTimeoutMs = int.Parse(args[++i]);
+                        break;
                     default:
                         Console.WriteLine($"Unknown argument: {args[i]}");
                         break;
@@ -146,11 +150,11 @@ namespace FeenicsCsvImport
                 if (dumpCount > 0)
                 {
                     Console.WriteLine($"Dumping the {dumpCount} most recent raw event(s) to help verify field names...");
-                    await service.DumpRecentEventsAsync(dumpCount, dumpDays);
+                    await service.DumpRecentEventsAsync(dumpCount, dumpDays, queryTimeoutMs);
                     return;
                 }
 
-                var result = await service.RunAsync(door, months, includeDenied);
+                var result = await service.RunAsync(door, months, includeDenied, queryTimeoutMs);
 
                 if (!result.Success)
                 {

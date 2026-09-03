@@ -29,6 +29,7 @@ It authenticates the same way the CSV sync job does, using these environment var
 | `--include-denied` | off | Include denied/failed attempts, not just granted access |
 | `--dump-events <n>` | *(none)* | Diagnostic mode — prints the N most recent raw events as JSON instead of running the report |
 | `--dump-events-days <n>` | `30` | How far back `--dump-events` looks. Narrowing this keeps the query cheap on a large Events collection (see below); widen it if your last event was longer ago than this |
+| `--query-timeout <ms>` | `120000` | Passed as `?queryTimeout=` on the aggregate/Events request. Raise this if you see `MongoExecutionTimeoutException` |
 
 ## First run: verify field names with `--dump-events`
 
@@ -57,6 +58,13 @@ If your instance uses different field names, adjust `BuildMatchStage` and `Extra
 - Sorting/limiting the Events collection with no date filter first can trigger a server-side
   `MongoExecutionTimeoutException` — the Events collection can be large. Both `--dump-events` and
   the main report always put a date `$match` first in the pipeline for this reason.
+- Date values in the pipeline must be MongoDB Extended JSON (`{"$date": "..."}`), not a plain ISO
+  string — a plain string silently fails to type-match the BSON `Date` field, so the `$match`
+  matches nothing and Mongo still scans the whole collection to prove it.
+- Even a well-targeted, date-narrowed query can still hit `MongoExecutionTimeoutException` if
+  `OccurredOn` isn't indexed on your instance (a full collection scan is required regardless of how
+  narrow the match window is). If you see this, raise `--query-timeout` (milliseconds) — the units
+  aren't confirmed from documentation, so try a much larger value if a moderate one doesn't help.
 
 ## Output
 

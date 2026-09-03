@@ -54,6 +54,15 @@ namespace FeenicsCsvImport.ClassLibrary
         private const string TokenClientId = "consoleApp";
         private const string TokenClientSecret = "consoleSecret";
 
+        /// <summary>
+        /// Passed as the ?queryTimeout= query-string param on aggregate/Events. A live instance
+        /// returned MongoExecutionTimeoutException even for a single-event, date-narrowed query,
+        /// which points at a short server-side default rather than the query itself being
+        /// expensive; this raises it. Units (ms vs seconds) aren't confirmed from docs -- adjust
+        /// via the --query-timeout CLI flag if this default doesn't help.
+        /// </summary>
+        private const int DefaultQueryTimeoutMs = 120000;
+
         private readonly string _apiUrl;
         private readonly string _instance;
         private readonly string _username;
@@ -83,7 +92,7 @@ namespace FeenicsCsvImport.ClassLibrary
         /// the full Events collection with no $match first hit a server-side MongoExecutionTimeoutException,
         /// so this narrows to a recent window before sorting, same as RunAsync does.
         /// </summary>
-        public async Task DumpRecentEventsAsync(int count = 5, int daysBack = 30)
+        public async Task DumpRecentEventsAsync(int count = 5, int daysBack = 30, int queryTimeoutMs = DefaultQueryTimeoutMs)
         {
             var instance = await GetInstanceAsync();
             var token = await GetAccessTokenAsync(_instance);
@@ -98,7 +107,7 @@ namespace FeenicsCsvImport.ClassLibrary
                 new JObject { ["$limit"] = count }
             };
 
-            var events = await PostAggregateEventsAsync(token, instance.Key.ToString(), pipeline);
+            var events = await PostAggregateEventsAsync(token, instance.Key.ToString(), pipeline, queryTimeoutMs);
             Log($"--- {events.Count} most recent event(s) (raw JSON) ---");
             if (events.Count == 0)
             {
@@ -114,7 +123,7 @@ namespace FeenicsCsvImport.ClassLibrary
         /// Builds the report: distinct people whose access events at a door matching doorNameContains
         /// occurred within the last `months` months, with their profile email.
         /// </summary>
-        public async Task<DoorUsageReportResult> RunAsync(string doorNameContains, int months = 9, bool includeDenied = false)
+        public async Task<DoorUsageReportResult> RunAsync(string doorNameContains, int months = 9, bool includeDenied = false, int queryTimeoutMs = DefaultQueryTimeoutMs)
         {
             var result = new DoorUsageReportResult();
             if (string.IsNullOrWhiteSpace(doorNameContains))
@@ -140,7 +149,7 @@ namespace FeenicsCsvImport.ClassLibrary
                 DateTime sinceUtc = DateTime.UtcNow.AddMonths(-months);
 
                 Log($"Querying event history for door matching '{doorNameContains}' since {sinceUtc:yyyy-MM-dd}...");
-                var events = await QueryAllEventsAsync(token, instance.Key.ToString(), sinceUtc, doorNameContains, includeDenied);
+                var events = await QueryAllEventsAsync(token, instance.Key.ToString(), sinceUtc, doorNameContains, includeDenied, queryTimeoutMs);
                 result.EventsScanned = events.Count;
                 Log($"Matched {events.Count} event(s).");
 
@@ -275,7 +284,7 @@ namespace FeenicsCsvImport.ClassLibrary
             }
         }
 
-        private async Task<List<JObject>> QueryAllEventsAsync(string token, string instanceKey, DateTime sinceUtc, string doorNameContains, bool includeDenied)
+        private async Task<List<JObject>> QueryAllEventsAsync(string token, string instanceKey, DateTime sinceUtc, string doorNameContains, bool includeDenied, int queryTimeoutMs)
         {
             var results = new List<JObject>();
             const int pageSize = 500;
@@ -301,7 +310,7 @@ namespace FeenicsCsvImport.ClassLibrary
                     new JObject { ["$limit"] = pageSize }
                 };
 
-                var page = await PostAggregateEventsAsync(token, instanceKey, pipeline);
+                var page = await PostAggregateEventsAsync(token, instanceKey, pipeline, queryTimeoutMs);
                 results.AddRange(page);
                 if (page.Count < pageSize)
                     break;
@@ -337,12 +346,12 @@ namespace FeenicsCsvImport.ClassLibrary
             return new JObject { ["$and"] = conditions };
         }
 
-        private async Task<List<JObject>> PostAggregateEventsAsync(string token, string instanceKey, JArray pipeline)
+        private async Task<List<JObject>> PostAggregateEventsAsync(string token, string instanceKey, JArray pipeline, int queryTimeoutMs)
         {
             using (var http = new HttpClient())
             {
                 http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                var url = $"{_apiUrl}/api/f/{instanceKey}/aggregate/Events";
+                var url = $"{_apiUrl}/api/f/{instanceKey}/aggregate/Events?queryTimeout={queryTimeoutMs}";
 
                 // Confirmed against a live instance: the endpoint rejects an array of raw nested
                 // stage objects ("unexpected character '{'"/"':'" parser errors). It wants each
