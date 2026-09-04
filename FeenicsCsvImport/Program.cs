@@ -26,6 +26,12 @@ namespace FeenicsCsvImport
                 return;
             }
 
+            if (args.Length > 0 && string.Equals(args[0], "inspect-wrapper", StringComparison.OrdinalIgnoreCase))
+            {
+                InspectWrapper();
+                return;
+            }
+
             try
             {
                 Console.WriteLine("=== Starting FeenicsCsvImport ===");
@@ -194,6 +200,72 @@ namespace FeenicsCsvImport
                 Console.WriteLine($"FATAL: {ex.Message}");
                 Environment.ExitCode = 1;
             }
+        }
+
+        /// <summary>
+        /// Diagnostic command: reflects over the Feenics.Keep.WebApi.Wrapper.Client type this app
+        /// is actually built and running against, printing the real signature of any method whose
+        /// name mentions Event/Reader/Portal/Connection/History. Runs in-process rather than via a
+        /// standalone reflection script so it benefits from this app's own binding redirects
+        /// (App.config / AutoGenerateBindingRedirects), avoiding the assembly-resolution issues a
+        /// bare PowerShell reflection attempt hits against this package's dependency graph.
+        /// Usage: FeenicsCsvImport.exe inspect-wrapper
+        /// </summary>
+        static void InspectWrapper()
+        {
+            var clientType = typeof(Client);
+            Console.WriteLine($"Assembly: {clientType.Assembly.FullName}");
+            Console.WriteLine($"Location: {clientType.Assembly.Location}");
+            Console.WriteLine();
+            Console.WriteLine("=== Client methods matching Event/Reader/Portal/Connection/History ===");
+
+            var relatedTypes = new Dictionary<string, Type>();
+
+            foreach (var m in clientType.GetMethods().Where(m => Regex.IsMatch(m.Name, "Event|Reader|Portal|Connection|History")))
+            {
+                var parms = string.Join(", ", m.GetParameters().Select(p => $"{FormatType(p.ParameterType)} {p.Name}"));
+                Console.WriteLine($"{FormatType(m.ReturnType)} {m.Name}({parms})");
+
+                var typesToCheck = new List<Type> { m.ReturnType };
+                typesToCheck.AddRange(m.GetParameters().Select(p => p.ParameterType));
+                foreach (var t in typesToCheck)
+                {
+                    var inner = t.IsGenericType ? t.GetGenericArguments() : new[] { t };
+                    foreach (var it in inner)
+                    {
+                        if (it.Namespace != null && it.Namespace.StartsWith("Feenics") && !relatedTypes.ContainsKey(it.FullName))
+                            relatedTypes[it.FullName] = it;
+                    }
+                }
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("=== Shape of related Feenics types ===");
+            foreach (var t in relatedTypes.Values)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"-- {t.FullName} --");
+                if (t.IsEnum)
+                {
+                    Console.WriteLine("  " + string.Join(", ", Enum.GetNames(t)));
+                }
+                else
+                {
+                    foreach (var p in t.GetProperties())
+                        Console.WriteLine($"  {FormatType(p.PropertyType)} {p.Name}");
+                }
+            }
+        }
+
+        static string FormatType(Type t)
+        {
+            if (t.IsGenericType)
+            {
+                var args = string.Join(", ", t.GetGenericArguments().Select(FormatType));
+                var name = t.Name.Substring(0, t.Name.IndexOf('`'));
+                return $"{name}<{args}>";
+            }
+            return t.Name;
         }
     }
 }
